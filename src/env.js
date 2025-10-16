@@ -11,6 +11,9 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+      MODAL_KEY: z.string(),
+      MODAL_SECRET: z.string(),
+      STOCK_ANALYZE_URL: z.string()
   },
 
   /**
@@ -30,6 +33,9 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
+    MODAL_KEY: process.env.MODAL_KEY,
+    MODAL_SECRET: process.env.MODAL_SECRET,
+    STOCK_ANALYZE_URL: process.env.STOCK_ANALYZE_URL
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
