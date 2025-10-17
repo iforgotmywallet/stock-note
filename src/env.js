@@ -13,7 +13,9 @@ export const env = createEnv({
       .default("development"),
       MODAL_KEY: z.string(),
       MODAL_SECRET: z.string(),
-      STOCK_ANALYZE_URL: z.string()
+      STOCK_ANALYZE_URL: z.string().url(),
+      BETTER_AUTH_SECRET: z.string(),
+      BETTER_AUTH_URL: z.string().url(),
   },
 
   /**
@@ -35,7 +37,9 @@ export const env = createEnv({
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
     MODAL_KEY: process.env.MODAL_KEY,
     MODAL_SECRET: process.env.MODAL_SECRET,
-    STOCK_ANALYZE_URL: process.env.STOCK_ANALYZE_URL
+    STOCK_ANALYZE_URL: process.env.STOCK_ANALYZE_URL,
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

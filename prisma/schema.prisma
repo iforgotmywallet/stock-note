@@ -1,20 +1,127 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+model agent_reports {
+  id                          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id                  String    @unique @db.VarChar(255)
+  ticker                      String    @db.VarChar(10)
+  analysis_date               DateTime  @db.Date
+  created_at                  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime? @default(now()) @db.Timestamptz(6)
+  market_analyst_report       String?
+  news_analyst_report         String?
+  fundamentals_analyst_report String?
+  social_analyst_report       String?
+  bull_researcher_report      String?
+  bear_researcher_report      String?
+  research_manager_report     String?
+  trader_report               String?
+  risky_analyst_report        String?
+  neutral_analyst_report      String?
+  safe_analyst_report         String?
+  portfolio_manager_report    String?
+  final_analysis              String?
+  recommendation              String?   @db.VarChar(15)
+  userId                      String?
+  user                        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@index([name])
+  @@index([created_at], map: "idx_agent_reports_created_at")
+  @@index([analysis_date], map: "idx_agent_reports_date")
+  @@index([session_id], map: "idx_agent_reports_session_id")
+  @@index([ticker], map: "idx_agent_reports_ticker")
+  @@index([ticker, analysis_date], map: "idx_agent_reports_ticker_date")
+  @@index([userId], map: "idx_agent_reports_user_id")
+}
+
+model User {
+  id            String          @id
+  name          String
+  email         String          @unique
+  emailVerified Boolean         @default(false)
+  image         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+  accounts      Account[]
+  agentReports  agent_reports[]
+  sessions      Session[]
+  watchlist     Watchlist[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
+}
+
+model Stock {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  symbol    String      @unique @db.VarChar(10)
+  company   String      @db.VarChar(255)
+  sector    String?     @db.VarChar(100)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @default(now()) @updatedAt
+  watchlist Watchlist[]
+
+  @@index([symbol], map: "idx_stock_symbol")
+  @@map("stock")
+}
+
+model Watchlist {
+  id      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId  String
+  stockId String   @db.Uuid
+  addedAt DateTime @default(now())
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stock   Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stockId], name: "unique_user_stock")
+  @@index([userId], map: "idx_watchlist_user_id")
+  @@index([stockId], map: "idx_watchlist_stock_id")
+  @@map("watchlist")
 }

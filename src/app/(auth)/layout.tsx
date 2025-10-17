@@ -2,6 +2,8 @@ import "~/styles/globals.css";
 
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
+import { Providers } from "~/components/providers";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Create T3 App",
@@ -19,7 +21,13 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${geist.variable}`}>
-      <body>{children}</body>
+      <body className="flex min-h-svh flex-col">
+        <Providers>
+          {children}
+          <Toaster />
+        </Providers>
+      </body>
+
     </html>
   );
 }
