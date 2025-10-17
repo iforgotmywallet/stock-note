@@ -133,6 +133,11 @@ const data = {
   ],
   documents: [
     {
+      name: "PYPL Oct-17",
+      url: "/pypl-dashboard",
+      icon: IconReport,
+    },
+    {
       name: "Data Library",
       url: "#",
       icon: IconDatabase,
