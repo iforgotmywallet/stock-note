@@ -1,12 +1,12 @@
 import { DataTable } from "~/components/data-table";
-import AnalysisCard from "~/components/analysis-card";
+import AnalysisSearchCard from "~/components/analysis-search-card";
 
 import data from "./data.json";
 
 export default function Page() {
   return (
     <div>
-      <AnalysisCard />
+      <AnalysisSearchCard />
       <DataTable data={data} />
     </div>
   );

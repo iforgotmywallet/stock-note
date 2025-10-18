@@ -4,39 +4,53 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import { LineChart, Loader2 } from "lucide-react";
+  Tags,
+  TagsContent,
+  TagsEmpty,
+  TagsGroup,
+  TagsInput,
+  TagsItem,
+  TagsList,
+  TagsTrigger,
+  TagsValue,
+} from "./ui/shadcn-io/tags";
+import { LineChart, Loader2, CheckIcon } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 
 interface FormData {
   ticker: string;
   analyze_date: string;
-  report_type: string;
+  analysts: string[];
 }
 
-interface ReportType {
-  value: string;
+interface ApiRequestBody {
+  ticker: string;
+  date: string;
+  analysts: string[];
+  config: {
+    llm_provider: string;
+    research_depth: number;
+  };
+}
+
+interface Analyst {
+  id: string;
   label: string;
 }
 
-const reportTypes: ReportType[] = [
-  { value: "technical", label: "Technical Analysis" },
-  { value: "fundamental", label: "Fundamental Analysis" },
-  { value: "comprehensive", label: "Comprehensive Analysis" },
-  { value: "risk", label: "Risk Assessment" },
+const analysts: Analyst[] = [
+  { id: "market", label: "Market" },
+  { id: "social", label: "Social" },
+  { id: "news", label: "News" },
+  { id: "fundamentals", label: "Fundamentals" },
 ];
 
-const AnalysisCard = () => {
+const AnalysisSearchCard = () => {
   const [formData, setFormData] = useState<FormData>({
     ticker: "",
     analyze_date: new Date().toISOString().split("T")[0] || "",
-    report_type: "technical",
+    analysts: [],
   });
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -48,13 +62,44 @@ const AnalysisCard = () => {
     }));
   };
 
+  const handleAnalystRemove = (value: string) => {
+    if (!formData.analysts.includes(value)) {
+      return;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      analysts: prev.analysts.filter((v) => v !== value),
+    }));
+  };
+
+  const handleAnalystSelect = (value: string) => {
+    if (formData.analysts.includes(value)) {
+      handleAnalystRemove(value);
+      return;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      analysts: [...prev.analysts, value],
+    }));
+  };
+
   const handleStartAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAnalyzing(true);
 
     try {
-      // Mock analysis process
-      console.log("Starting analysis for:", formData);
+      // Transform form data to match API expected format
+      const requestBody: ApiRequestBody = {
+        ticker: formData.ticker,
+        date: formData.analyze_date, // Map analyze_date to date
+        analysts: formData.analysts,
+        config: {
+          llm_provider: process.env.NEXT_PUBLIC_LLM_PROVIDER || "openai",
+          research_depth: parseInt(process.env.NEXT_PUBLIC_RESEARCH_DEPTH || "3"),
+        },
+      };
+
+      console.log("Starting analysis for:", requestBody);
 
       // Simulate API call delay
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -63,7 +108,7 @@ const AnalysisCard = () => {
       // const response = await fetch('/api/analyze', {
       //   method: 'POST',
       //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
+      //   body: JSON.stringify(requestBody)
       // })
 
       console.log("Analysis completed");
@@ -123,31 +168,52 @@ const AnalysisCard = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="report_type">Report Type *</Label>
-                  <Select
-                    value={formData.report_type}
-                    onValueChange={(value) =>
-                      handleInputChange("report_type", value)
-                    }
-                    disabled={isAnalyzing}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {reportTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
+                  <Label htmlFor="analysts">Choose Analyst *</Label>
+                  <Tags className="w-full">
+                    <TagsTrigger>
+                      {formData.analysts.map((analystId) => (
+                        <TagsValue
+                          key={analystId}
+                          onRemove={() => handleAnalystRemove(analystId)}
+                        >
+                          {analysts.find((a) => a.id === analystId)?.label}
+                        </TagsValue>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </TagsTrigger>
+                    <TagsContent>
+                      <TagsInput placeholder="Search analyst..." />
+                      <TagsList>
+                        <TagsEmpty />
+                        <TagsGroup>
+                          {analysts.map((analyst) => (
+                            <TagsItem
+                              key={analyst.id}
+                              onSelect={handleAnalystSelect}
+                              value={analyst.id}
+                            >
+                              {analyst.label}
+                              {formData.analysts.includes(analyst.id) && (
+                                <CheckIcon
+                                  className="text-muted-foreground"
+                                  size={14}
+                                />
+                              )}
+                            </TagsItem>
+                          ))}
+                        </TagsGroup>
+                      </TagsList>
+                    </TagsContent>
+                  </Tags>
                 </div>
               </div>
 
               <Button
                 type="submit"
-                disabled={isAnalyzing || !formData.ticker}
+                disabled={
+                  isAnalyzing ||
+                  !formData.ticker ||
+                  formData.analysts.length === 0
+                }
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
                 {isAnalyzing ? (
@@ -170,4 +236,4 @@ const AnalysisCard = () => {
   );
 };
 
-export default AnalysisCard;
+export default AnalysisSearchCard;

@@ -17,6 +17,7 @@ import {
   IconSearch,
   IconSettings,
   IconUsers,
+  IconStackMiddle
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "~/components/nav-documents"
@@ -46,25 +47,20 @@ const data = {
       icon: IconDashboard,
     },
     {
-      title: "Lifecycle",
+      title: "Trending",
       url: "#",
       icon: IconListDetails,
     },
     {
-      title: "Analytics",
-      url: "#",
-      icon: IconChartBar,
-    },
-    {
-      title: "Projects",
+      title: "Watch List",
       url: "#",
       icon: IconFolder,
     },
     {
-      title: "Team",
+      title: "Search",
       url: "#",
-      icon: IconUsers,
-    },
+      icon: IconChartBar,
+    }
   ],
   navClouds: [
     {
@@ -124,34 +120,14 @@ const data = {
       title: "Get Help",
       url: "#",
       icon: IconHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
-    },
+    }
   ],
   documents: [
     {
       name: "PYPL Oct-17",
       url: "/pypl-dashboard",
       icon: IconReport,
-    },
-    {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
-    },
+    }
   ],
 }
 
@@ -166,8 +142,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <a href="#">
-                <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
+                <IconStackMiddle className="!size-5" />
+                <span className="text-base font-semibold">StockNotes</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
