@@ -8,12 +8,12 @@ datasource db {
 }
 
 model agent_reports {
-  id                          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  session_id                  String    @unique @db.VarChar(255)
-  ticker                      String    @db.VarChar(10)
-  analysis_date               DateTime  @db.Date
-  created_at                  DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at                  DateTime? @default(now()) @db.Timestamptz(6)
+  id                          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id                  String       @unique @db.VarChar(255)
+  ticker                      String       @db.VarChar(10)
+  analysis_date               DateTime     @db.Date
+  created_at                  DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime?    @default(now()) @db.Timestamptz(6)
   market_analyst_report       String?
   news_analyst_report         String?
   fundamentals_analyst_report String?
@@ -27,9 +27,11 @@ model agent_reports {
   safe_analyst_report         String?
   portfolio_manager_report    String?
   final_analysis              String?
-  recommendation              String?   @db.VarChar(15)
+  recommendation              String?      @db.VarChar(15)
+  published                   Boolean      @default(false)
   userId                      String?
-  user                        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recentList                  RecentList[]
 
   @@index([created_at], map: "idx_agent_reports_created_at")
   @@index([analysis_date], map: "idx_agent_reports_date")
@@ -49,6 +51,7 @@ model User {
   updatedAt     DateTime        @default(now()) @updatedAt
   accounts      Account[]
   agentReports  agent_reports[]
+  recentList    RecentList[]
   sessions      Session[]
   watchlist     Watchlist[]
 
@@ -117,11 +120,26 @@ model Watchlist {
   userId  String
   stockId String   @db.Uuid
   addedAt DateTime @default(now())
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   stock   Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, stockId], name: "unique_user_stock")
   @@index([userId], map: "idx_watchlist_user_id")
   @@index([stockId], map: "idx_watchlist_stock_id")
   @@map("watchlist")
+}
+
+model RecentList {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String
+  sessionId String        @db.VarChar(255)
+  viewedAt  DateTime      @default(now())
+  report    agent_reports @relation(fields: [sessionId], references: [session_id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sessionId], name: "unique_user_session")
+  @@index([userId], map: "idx_recent_list_user_id")
+  @@index([sessionId], map: "idx_recent_list_session_id")
+  @@index([viewedAt], map: "idx_recent_list_viewed_at")
+  @@map("recent_list")
 }
