@@ -77,7 +77,7 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
     <div className={`bg-background min-h-screen ${className}`}>
       <div className="container mx-auto max-w-7xl">
         {/* Header Section */}
-        <div className="mb-4 flex flex-col items-start justify-between gap-4 px-4 sm:flex-row sm:items-center sm:px-6">
+        <div className="mb-8 flex flex-col items-start justify-between sm:flex-row sm:items-center sm:px-6">
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold tracking-tight">{stockData?.ticker ?? 'LOADING'}</h1>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
@@ -193,7 +193,7 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                   <CardHeader>
                     <CardTitle>Technical Analysis Report</CardTitle>
                     <CardDescription>
-                      Comprehensive analysis of {stockData.ticker}&apos;s current technical position
+                      Comprehensive analysis of {stockData.ticker}'s current technical position
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
