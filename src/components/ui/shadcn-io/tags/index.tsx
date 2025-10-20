@@ -86,7 +86,7 @@ export const Tags = ({
     }
 
     const resizeObserver = new ResizeObserver((entries) => {
-      setWidth(entries[0].contentRect.width);
+      setWidth(entries[0]?.contentRect.width || 0);
     });
 
     resizeObserver.observe(ref.current);
