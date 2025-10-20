@@ -1,8 +1,8 @@
 "use client";
 
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import React from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface MarkdownRendererProps {
   content: string;
@@ -11,32 +11,35 @@ interface MarkdownRendererProps {
 
 interface ComponentProps {
   children?: React.ReactNode;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 const components = {
   h1: ({ children, ...props }: ComponentProps) => (
-    <h1 className="text-2xl font-bold mb-4 text-foreground" {...props}>
+    <h1 className="text-foreground mb-4 text-2xl font-bold" {...props}>
       {children}
     </h1>
   ),
   h2: ({ children, ...props }: ComponentProps) => (
-    <h2 className="text-xl font-semibold mb-3 text-foreground" {...props}>
+    <h2 className="text-foreground mb-3 text-xl font-semibold" {...props}>
       {children}
     </h2>
   ),
   h3: ({ children, ...props }: ComponentProps) => (
-    <h3 className="text-lg font-medium mb-2 text-foreground" {...props}>
+    <h3 className="text-foreground mb-2 text-lg font-medium" {...props}>
       {children}
     </h3>
   ),
   h4: ({ children, ...props }: ComponentProps) => (
-    <h4 className="text-base font-medium mb-2 text-foreground" {...props}>
+    <h4 className="text-foreground mb-2 text-base font-medium" {...props}>
       {children}
     </h4>
   ),
   p: ({ children, ...props }: ComponentProps) => (
-    <p className="mb-3 text-sm text-muted-foreground leading-relaxed" {...props}>
+    <p
+      className="text-muted-foreground mb-3 text-sm leading-relaxed"
+      {...props}
+    >
       {children}
     </p>
   ),
@@ -51,12 +54,12 @@ const components = {
     </ol>
   ),
   li: ({ children, ...props }: ComponentProps) => (
-    <li className="text-sm text-muted-foreground" {...props}>
+    <li className="text-muted-foreground text-sm" {...props}>
       {children}
     </li>
   ),
   strong: ({ children, ...props }: ComponentProps) => (
-    <strong className="font-semibold text-foreground" {...props}>
+    <strong className="text-foreground font-semibold" {...props}>
       {children}
     </strong>
   ),
@@ -66,23 +69,29 @@ const components = {
     </em>
   ),
   blockquote: ({ children, ...props }: ComponentProps) => (
-    <blockquote className="border-l-4 border-border pl-4 mb-3 italic text-muted-foreground" {...props}>
+    <blockquote
+      className="border-border text-muted-foreground mb-3 border-l-4 pl-4 italic"
+      {...props}
+    >
       {children}
     </blockquote>
   ),
   code: ({ children, ...props }: ComponentProps) => (
-    <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono" {...props}>
+    <code className="bg-muted rounded px-1 py-0.5 font-mono text-sm" {...props}>
       {children}
     </code>
   ),
   pre: ({ children, ...props }: ComponentProps) => (
-    <pre className="bg-muted p-3 rounded-lg mb-3 overflow-x-auto" {...props}>
+    <pre className="bg-muted mb-3 overflow-x-auto rounded-lg p-3" {...props}>
       {children}
     </pre>
   ),
   table: ({ children, ...props }: ComponentProps) => (
     <div className="mb-4 overflow-x-auto">
-      <table className="min-w-full border-collapse border border-border" {...props}>
+      <table
+        className="border-border min-w-full border-collapse border"
+        {...props}
+      >
         {children}
       </table>
     </div>
@@ -93,48 +102,56 @@ const components = {
     </thead>
   ),
   tbody: ({ children, ...props }: ComponentProps) => (
-    <tbody {...props}>
-      {children}
-    </tbody>
+    <tbody {...props}>{children}</tbody>
   ),
   tr: ({ children, ...props }: ComponentProps) => (
-    <tr className="border-b border-border" {...props}>
+    <tr className="border-border border-b" {...props}>
       {children}
     </tr>
   ),
   th: ({ children, ...props }: ComponentProps) => (
-    <th className="border border-border px-3 py-2 text-left text-sm font-medium text-foreground" {...props}>
+    <th
+      className="border-border text-foreground border px-3 py-2 text-left text-sm font-medium"
+      {...props}
+    >
       {children}
     </th>
   ),
   td: ({ children, ...props }: ComponentProps) => (
-    <td className="border border-border px-3 py-2 text-sm text-muted-foreground" {...props}>
+    <td
+      className="border-border text-muted-foreground border px-3 py-2 text-sm"
+      {...props}
+    >
       {children}
     </td>
   ),
-  a: ({ children, href, ...props }: ComponentProps & { href?: string }) => (
-    <a 
-      href={href} 
-      className="text-primary hover:underline" 
-      target="_blank" 
-      rel="noopener noreferrer" 
+  a: ({
+    children,
+    href,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a
+      href={href}
+      className="text-primary hover:underline"
+      target="_blank"
+      rel="noopener noreferrer"
       {...props}
     >
       {children}
     </a>
   ),
   hr: ({ ...props }: ComponentProps) => (
-    <hr className="my-4 border-border" {...props} />
+    <hr className="border-border my-4" {...props} />
   ),
 };
 
-export function MarkdownRenderer({ content, className = "" }: MarkdownRendererProps) {
+export function MarkdownRenderer({
+  content,
+  className = "",
+}: MarkdownRendererProps) {
   return (
     <div className={`prose prose-sm max-w-none ${className}`}>
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]} 
-        components={components}
-      >
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
     </div>

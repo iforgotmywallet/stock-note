@@ -17,21 +17,13 @@ import {
 import { LineChart, Loader2, CheckIcon } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
+import { toast } from "sonner";
+import { queueAnalysisReport } from "~/actions/generation";
 
 interface FormData {
   ticker: string;
   analyze_date: string;
   analysts: string[];
-}
-
-interface ApiRequestBody {
-  ticker: string;
-  date: string;
-  analysts: string[];
-  config: {
-    llm_provider: string;
-    research_depth: number;
-  };
 }
 
 interface Analyst {
@@ -88,32 +80,27 @@ const AnalysisSearchCard = () => {
     setIsAnalyzing(true);
 
     try {
-      // Transform form data to match API expected format
-      const requestBody: ApiRequestBody = {
+      // Queue the analysis using the server action
+      const result = await queueAnalysisReport({
         ticker: formData.ticker,
-        date: formData.analyze_date, // Map analyze_date to date
+        date: formData.analyze_date,
         analysts: formData.analysts,
-        config: {
-          llm_provider: process.env.NEXT_PUBLIC_LLM_PROVIDER || "openai",
-          research_depth: parseInt(process.env.NEXT_PUBLIC_RESEARCH_DEPTH || "3"),
-        },
-      };
+        published: true,
+      });
 
-      console.log("Starting analysis for:", requestBody);
-
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Here you would typically make an API call to start the analysis
-      // const response = await fetch('/api/analyze', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(requestBody)
-      // })
-
-      console.log("Analysis completed");
+      if (result.success) {
+        console.log("Analysis queued successfully:", result.eventId);
+        toast.success(
+          "🚀 Analysis started! This may take up to 4 minutes to complete.",
+        );
+        // TODO: update UI table
+      } else {
+        console.error("Failed to queue analysis:", result.message);
+        toast.error("❌ Failed to start analysis. Please try again.");
+      }
     } catch (error) {
       console.error("Analysis failed:", error);
+      toast.error("❌ Something went wrong. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }

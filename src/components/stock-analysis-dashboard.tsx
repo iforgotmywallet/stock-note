@@ -28,7 +28,9 @@ interface StockAnalysisDashboardProps {
   className?: string;
 }
 
-export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProps) {
+export function StockAnalysisDashboard({
+  className,
+}: StockAnalysisDashboardProps) {
   const [activeTab, setActiveTab] = React.useState("overview");
   const [stockData, setStockData] = React.useState<StockData | null>(null);
 
@@ -36,11 +38,11 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
   React.useEffect(() => {
     const loadStockData = async () => {
       try {
-        const response = await fetch('/pypl-dashboard-data.json');
-        const data = await response.json() as { data: StockData };
+        const response = await fetch("/pypl-dashboard-data.json");
+        const data = (await response.json()) as { data: StockData };
         setStockData(data.data);
       } catch (error) {
-        console.error('Failed to load stock analysis data:', error);
+        console.error("Failed to load stock analysis data:", error);
       }
     };
     void loadStockData();
@@ -49,16 +51,14 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
   // Extract data from the loaded stock data
   const extractedData = React.useMemo(() => {
     if (!stockData) return null;
-    
-    // Extract price info from sentiment report
-    const priceRegex = /stock price for PayPal is \$(\d+\.\d+)/;
-    const changeRegex = /change of \$(\d+\.\d+) \(([^)]+)\)/;
-    const priceMatch = priceRegex.exec(stockData.analysis.sentiment_report);
-    const changeMatch = changeRegex.exec(stockData.analysis.sentiment_report);
-    
+
+    // Extract price info from market report
+    const priceRegex =
+      /\*\*(?:Current Price|Current Close)(?:\s*\([^)]+\))?\*\*:\s*\$(\d+\.\d+)/;
+    const priceMatch = priceRegex.exec(stockData.analysis.market_report);
+
     return {
-      currentPrice: priceMatch ? `$${priceMatch[1]}` : 'N/A',
-      priceChange: changeMatch ? `$${changeMatch[1]} (${changeMatch[2]})` : 'N/A',
+      currentPrice: priceMatch ? `$${priceMatch[1]} 💰` : "N/A",
     };
   }, [stockData]);
 
@@ -79,24 +79,30 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
         {/* Header Section */}
         <div className="mb-8 flex flex-col items-start justify-between sm:flex-row sm:items-center sm:px-6">
           <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold tracking-tight">{stockData?.ticker ?? 'LOADING'}</h1>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <span className="text-lg font-semibold">{extractedData?.currentPrice ?? 'Loading...'}</span>
-              <span className="text-sm text-green-600">{extractedData?.priceChange ?? 'Loading...'}</span>
-              <span className="text-muted-foreground">{stockData?.date ?? 'Loading...'}</span>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {stockData?.ticker ?? "LOADING"}
+            </h1>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <span className="text-lg font-semibold">
+                {extractedData?.currentPrice ?? "Loading..."}
+              </span>
+
+              <span className="text-muted-foreground">
+                {stockData?.date ?? "Loading..."}
+              </span>
             </div>
           </div>
           <Button
             size="sm"
             className={`text-white hover:opacity-90 ${
-              stockData?.analysis?.recommendation_type === 'BUY' 
-                ? 'bg-green-600 hover:bg-green-700' 
-                : stockData?.analysis?.recommendation_type === 'SELL'
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-yellow-600 hover:bg-yellow-700'
+              stockData?.analysis?.recommendation_type === "BUY"
+                ? "bg-green-600 hover:bg-green-700"
+                : stockData?.analysis?.recommendation_type === "SELL"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : "bg-yellow-600 hover:bg-yellow-700"
             }`}
           >
-            {stockData?.analysis?.recommendation_type || 'LOADING'}
+            {stockData?.analysis?.recommendation_type || "LOADING"}
           </Button>
         </div>
 
@@ -141,38 +147,46 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     Final Recommendation
-                    <span className={`px-2 py-1 text-sm font-medium rounded ${
-                      stockData?.analysis?.recommendation_type === 'BUY' 
-                        ? 'bg-green-100 text-green-800' 
-                        : stockData?.analysis?.recommendation_type === 'SELL'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {stockData?.analysis?.recommendation_type ?? 'LOADING'}
+                    <span
+                      className={`rounded px-2 py-1 text-sm font-medium ${
+                        stockData?.analysis?.recommendation_type === "BUY"
+                          ? "bg-green-100 text-green-800"
+                          : stockData?.analysis?.recommendation_type === "SELL"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {stockData?.analysis?.recommendation_type ?? "LOADING"}
                     </span>
                   </CardTitle>
                   <CardDescription>
-                    Based on comprehensive technical, fundamental, and sentiment analysis
+                    Based on comprehensive technical, fundamental, and sentiment
+                    analysis
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     <p className="text-sm">
-                      Current analysis indicates a <strong>{stockData?.analysis?.recommendation_type ?? 'LOADING'}</strong> recommendation for {stockData?.ticker ?? 'this stock'} 
-                      based on comprehensive multi-factor analysis including technical indicators, fundamental metrics, 
-                      and market sentiment evaluation.
+                      Current analysis indicates a{" "}
+                      <strong>
+                        {stockData?.analysis?.recommendation_type ?? "LOADING"}
+                      </strong>{" "}
+                      recommendation for {stockData?.ticker ?? "this stock"}
+                      based on comprehensive multi-factor analysis including
+                      technical indicators, fundamental metrics, and market
+                      sentiment evaluation.
                     </p>
                     {/* Display final recommendation from data */}
                     {stockData?.analysis?.final_recommendation && (
                       <div className="mt-4">
-                        <MarkdownRenderer content={stockData.analysis.final_recommendation} />
+                        <MarkdownRenderer
+                          content={stockData.analysis.final_recommendation}
+                        />
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
-
-
             </div>
           </TabsContent>
 
@@ -193,16 +207,17 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                   <CardHeader>
                     <CardTitle>Technical Analysis Report</CardTitle>
                     <CardDescription>
-                      Comprehensive analysis of {stockData.ticker}'s current technical position
+                      Comprehensive analysis of {stockData.ticker}'s current
+                      technical position
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <MarkdownRenderer content={stockData.analysis.market_report} />
+                    <MarkdownRenderer
+                      content={stockData.analysis.market_report}
+                    />
                   </CardContent>
                 </Card>
               )}
-
-
             </div>
           </TabsContent>
 
@@ -223,16 +238,17 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                   <CardHeader>
                     <CardTitle>Sentiment Analysis Report</CardTitle>
                     <CardDescription>
-                      Comprehensive analysis of market sentiment and social indicators
+                      Comprehensive analysis of market sentiment and social
+                      indicators
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <MarkdownRenderer content={stockData.analysis.sentiment_report} />
+                    <MarkdownRenderer
+                      content={stockData.analysis.sentiment_report}
+                    />
                   </CardContent>
                 </Card>
               )}
-
-
             </div>
           </TabsContent>
 
@@ -253,16 +269,17 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                   <CardHeader>
                     <CardTitle>News Analysis Report</CardTitle>
                     <CardDescription>
-                      Current market news and macroeconomic factors affecting {stockData.ticker}
+                      Current market news and macroeconomic factors affecting{" "}
+                      {stockData.ticker}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <MarkdownRenderer content={stockData.analysis.news_report} />
+                    <MarkdownRenderer
+                      content={stockData.analysis.news_report}
+                    />
                   </CardContent>
                 </Card>
               )}
-
-
             </div>
           </TabsContent>
 
@@ -283,16 +300,17 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                   <CardHeader>
                     <CardTitle>Fundamentals Analysis Report</CardTitle>
                     <CardDescription>
-                      Financial metrics, insider transactions, and fundamental analysis
+                      Financial metrics, insider transactions, and fundamental
+                      analysis
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <MarkdownRenderer content={stockData.analysis.fundamentals_report} />
+                    <MarkdownRenderer
+                      content={stockData.analysis.fundamentals_report}
+                    />
                   </CardContent>
                 </Card>
               )}
-
-
             </div>
           </TabsContent>
 
@@ -318,10 +336,14 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer content={stockData.analysis.investment_debate.bull_analysis} />
+                      <MarkdownRenderer
+                        content={
+                          stockData.analysis.investment_debate.bull_analysis
+                        }
+                      />
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader>
                       <CardTitle>Bear Analysis</CardTitle>
@@ -330,10 +352,14 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer content={stockData.analysis.investment_debate.bear_analysis} />
+                      <MarkdownRenderer
+                        content={
+                          stockData.analysis.investment_debate.bear_analysis
+                        }
+                      />
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader>
                       <CardTitle>Judge Decision</CardTitle>
@@ -342,13 +368,15 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer content={stockData.analysis.investment_debate.judge_decision} />
+                      <MarkdownRenderer
+                        content={
+                          stockData.analysis.investment_debate.judge_decision
+                        }
+                      />
                     </CardContent>
                   </Card>
                 </div>
               )}
-
-
             </div>
           </TabsContent>
 
@@ -370,14 +398,19 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                     <CardHeader>
                       <CardTitle>High-Risk Analysis</CardTitle>
                       <CardDescription>
-                        Aggressive investment perspective focusing on high-reward opportunities
+                        Aggressive investment perspective focusing on
+                        high-reward opportunities
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer content={stockData.analysis.risk_assessment.risky_analysis} />
+                      <MarkdownRenderer
+                        content={
+                          stockData.analysis.risk_assessment.risky_analysis
+                        }
+                      />
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader>
                       <CardTitle>Conservative Analysis</CardTitle>
@@ -386,10 +419,14 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer content={stockData.analysis.risk_assessment.safe_analysis} />
+                      <MarkdownRenderer
+                        content={
+                          stockData.analysis.risk_assessment.safe_analysis
+                        }
+                      />
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader>
                       <CardTitle>Balanced Analysis</CardTitle>
@@ -398,10 +435,14 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer content={stockData.analysis.risk_assessment.neutral_analysis} />
+                      <MarkdownRenderer
+                        content={
+                          stockData.analysis.risk_assessment.neutral_analysis
+                        }
+                      />
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader>
                       <CardTitle>Risk Assessment Decision</CardTitle>
@@ -410,13 +451,15 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer content={stockData.analysis.risk_assessment.judge_decision} />
+                      <MarkdownRenderer
+                        content={
+                          stockData.analysis.risk_assessment.judge_decision
+                        }
+                      />
                     </CardContent>
                   </Card>
                 </div>
               )}
-
-
             </div>
           </TabsContent>
 
@@ -441,7 +484,9 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <MarkdownRenderer content={stockData.analysis.trader_plan} />
+                    <MarkdownRenderer
+                      content={stockData.analysis.trader_plan}
+                    />
                   </CardContent>
                 </Card>
               )}
@@ -452,16 +497,17 @@ export function StockAnalysisDashboard({ className }: StockAnalysisDashboardProp
                   <CardHeader>
                     <CardTitle>Final Investment Recommendation</CardTitle>
                     <CardDescription>
-                      Detailed final recommendation with rationale and action plan
+                      Detailed final recommendation with rationale and action
+                      plan
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <MarkdownRenderer content={stockData.analysis.final_recommendation} />
+                    <MarkdownRenderer
+                      content={stockData.analysis.final_recommendation}
+                    />
                   </CardContent>
                 </Card>
               )}
-
-
             </div>
           </TabsContent>
         </Tabs>

@@ -1,6 +1,6 @@
 "use client"
 
-import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react"
+import { IconCirclePlusFilled, IconCalendarTime, type Icon } from "@tabler/icons-react"
 import { useRouter } from "next/navigation"
 
 import { Button } from "~/components/ui/button"
@@ -45,7 +45,7 @@ export function NavMain({
               className="size-8 group-data-[collapsible=icon]:opacity-0"
               variant="outline"
             >
-              <IconMail />
+              <IconCalendarTime />
               <span className="sr-only">Inbox</span>
             </Button>
           </SidebarMenuItem>

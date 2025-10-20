@@ -6,6 +6,7 @@ import { Providers } from "~/components/providers";
 import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/app-sidebar";
 import { SiteHeader } from "~/components/site-header";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Create T3 App",
@@ -45,6 +46,7 @@ export default function RootLayout({
                 </div>
               </SidebarInset>
             </SidebarProvider>
+            <Toaster />
         </Providers>
       </body>
     </html>

@@ -20,7 +20,10 @@ CREATE TABLE "agent_reports" (
     "portfolio_manager_report" TEXT,
     "final_analysis" TEXT,
     "recommendation" VARCHAR(15),
-    "userId" TEXT,
+    "userId" TEXT NOT NULL,
+    "published" BOOLEAN NOT NULL DEFAULT false,
+    "status" TEXT NOT NULL DEFAULT 'queued',
+    "viewCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "agent_reports_pkey" PRIMARY KEY ("id")
 );
@@ -33,7 +36,8 @@ CREATE TABLE "user" (
     "emailVerified" BOOLEAN NOT NULL DEFAULT false,
     "image" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "credits" INTEGER NOT NULL DEFAULT 100,
 
     CONSTRAINT "user_pkey" PRIMARY KEY ("id")
 );
@@ -78,7 +82,7 @@ CREATE TABLE "verification" (
     "value" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "verification_pkey" PRIMARY KEY ("id")
 );
@@ -90,7 +94,7 @@ CREATE TABLE "stock" (
     "company" VARCHAR(255) NOT NULL,
     "sector" VARCHAR(100),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "stock_pkey" PRIMARY KEY ("id")
 );
@@ -100,7 +104,8 @@ CREATE TABLE "watchlist" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "userId" TEXT NOT NULL,
     "stockId" UUID NOT NULL,
-    "addedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "watchlist_pkey" PRIMARY KEY ("id")
 );
@@ -111,8 +116,22 @@ CREATE TABLE "recent_list" (
     "userId" TEXT NOT NULL,
     "sessionId" VARCHAR(255) NOT NULL,
     "viewedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "recent_list_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "saved_list" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" TEXT NOT NULL,
+    "sessionId" VARCHAR(255) NOT NULL,
+    "savedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "saved_list_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -120,6 +139,12 @@ CREATE UNIQUE INDEX "agent_reports_session_id_key" ON "agent_reports"("session_i
 
 -- CreateIndex
 CREATE INDEX "idx_agent_reports_created_at" ON "agent_reports"("created_at");
+
+-- CreateIndex
+CREATE INDEX "idx_agent_reports_published" ON "agent_reports"("published");
+
+-- CreateIndex
+CREATE INDEX "idx_agent_reports_status" ON "agent_reports"("status");
 
 -- CreateIndex
 CREATE INDEX "idx_agent_reports_date" ON "agent_reports"("analysis_date");
@@ -155,6 +180,9 @@ CREATE INDEX "idx_watchlist_user_id" ON "watchlist"("userId");
 CREATE INDEX "idx_watchlist_stock_id" ON "watchlist"("stockId");
 
 -- CreateIndex
+CREATE INDEX "idx_watchlist_created_at" ON "watchlist"("createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "watchlist_userId_stockId_key" ON "watchlist"("userId", "stockId");
 
 -- CreateIndex
@@ -167,7 +195,25 @@ CREATE INDEX "idx_recent_list_session_id" ON "recent_list"("sessionId");
 CREATE INDEX "idx_recent_list_viewed_at" ON "recent_list"("viewedAt");
 
 -- CreateIndex
+CREATE INDEX "idx_recent_list_created_at" ON "recent_list"("createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "recent_list_userId_sessionId_key" ON "recent_list"("userId", "sessionId");
+
+-- CreateIndex
+CREATE INDEX "idx_saved_list_user_id" ON "saved_list"("userId");
+
+-- CreateIndex
+CREATE INDEX "idx_saved_list_session_id" ON "saved_list"("sessionId");
+
+-- CreateIndex
+CREATE INDEX "idx_saved_list_saved_at" ON "saved_list"("savedAt");
+
+-- CreateIndex
+CREATE INDEX "idx_saved_list_created_at" ON "saved_list"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "saved_list_userId_sessionId_key" ON "saved_list"("userId", "sessionId");
 
 -- AddForeignKey
 ALTER TABLE "agent_reports" ADD CONSTRAINT "agent_reports_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -179,13 +225,19 @@ ALTER TABLE "session" ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId"
 ALTER TABLE "account" ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "watchlist" ADD CONSTRAINT "watchlist_stockId_fkey" FOREIGN KEY ("stockId") REFERENCES "stock"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "watchlist" ADD CONSTRAINT "watchlist_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "watchlist" ADD CONSTRAINT "watchlist_stockId_fkey" FOREIGN KEY ("stockId") REFERENCES "stock"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "recent_list" ADD CONSTRAINT "recent_list_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "agent_reports"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "recent_list" ADD CONSTRAINT "recent_list_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "recent_list" ADD CONSTRAINT "recent_list_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "agent_reports"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "saved_list" ADD CONSTRAINT "saved_list_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "agent_reports"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "saved_list" ADD CONSTRAINT "saved_list_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;

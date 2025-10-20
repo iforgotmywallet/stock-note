@@ -1,4 +1,0 @@
--- AlterTable
-ALTER TABLE "agent_reports" ALTER COLUMN "created_at" DROP NOT NULL,
-ALTER COLUMN "updated_at" DROP NOT NULL,
-ALTER COLUMN "updated_at" SET DEFAULT CURRENT_TIMESTAMP;

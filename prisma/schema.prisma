@@ -28,11 +28,10 @@ model agent_reports {
   portfolio_manager_report    String?
   final_analysis              String?
   recommendation              String?      @db.VarChar(15)
-  userId                      String?
+  userId                      String
   published                   Boolean      @default(false)
-  status                      String       @default("queued")
-  viewCount                   Int          @default(0)
-  user                        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                      String       @default("processing")
+  user                        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   recentList                  RecentList[]
   savedList                   SavedList[]
 
