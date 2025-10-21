@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useEffect, useState } from "react";
 import {
   IconCamera,
   IconChartBar,
@@ -18,6 +19,7 @@ import {
   IconSettings,
   IconUsers,
   IconStackMiddle,
+  IconAlertCircle,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "~/components/nav-documents";
@@ -33,6 +35,39 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "~/components/ui/sidebar";
+import { authClient } from "~/lib/auth-client";
+
+// Error Boundary Component for Sidebar
+class SidebarErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode; fallback?: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Sidebar Error Boundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div className="flex items-center gap-2 p-4 text-sidebar-foreground/50">
+          <IconAlertCircle className="h-4 w-4" />
+          <span className="text-sm">Failed to load sidebar</span>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const data = {
   user: {
@@ -122,16 +157,37 @@ const data = {
       icon: IconHelp,
     },
   ],
-  documents: [
-    {
-      name: "PYPL Oct-17",
-      url: "/PYPL10-18",
-      icon: IconReport,
-    },
-  ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        setIsLoadingUser(true);
+        const session = await authClient.getSession();
+        if (session?.data?.user) {
+          setCurrentUser({
+            id: session.data.user.id,
+            name: session.data.user.name || 'User',
+            email: session.data.user.email || '',
+          });
+        } else {
+          setCurrentUser(null);
+        }
+      } catch (error) {
+        console.error('Error getting current user:', error);
+        setCurrentUser(null);
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+
+    getCurrentUser();
+  }, []);
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -150,12 +206,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <SidebarErrorBoundary>
+          <NavMain items={data.navMain} />
+        </SidebarErrorBoundary>
+        <SidebarErrorBoundary>
+          <NavDocuments userId={currentUser?.id || ""} />
+        </SidebarErrorBoundary>
+        <SidebarErrorBoundary>
+          <NavSecondary items={data.navSecondary} className="mt-auto" />
+        </SidebarErrorBoundary>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <SidebarErrorBoundary>
+          <NavUser user={currentUser ? {
+            name: currentUser.name,
+            email: currentUser.email,
+            avatar: "/avatars/shadcn.jpg", // Keep default avatar for now
+          } : data.user} />
+        </SidebarErrorBoundary>
       </SidebarFooter>
     </Sidebar>
   );

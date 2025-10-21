@@ -19,13 +19,13 @@ export const generateAnalysis = inngest.createFunction(
         // Create a predictable session_id for failures to enable upsert
         const failureSessionId = `failed-${userId}-${ticker}-${date}-${Date.now()}`;
 
-        // Create or update entry in agent_reports table with status "fail"
+        // Create or update entry in agent_reports table with status "failed"
         await db.agent_reports.upsert({
           where: {
             session_id: failureSessionId,
           },
           update: {
-            status: "fail",
+            status: "failed",
             updated_at: new Date(),
           },
           create: {
@@ -33,7 +33,7 @@ export const generateAnalysis = inngest.createFunction(
             ticker,
             analysis_date: new Date(date),
             userId,
-            status: "fail",
+            status: "failed",
           },
         });
       }
@@ -100,13 +100,13 @@ export const generateAnalysis = inngest.createFunction(
       // Create a predictable session_id for failures to enable upsert
       const failureSessionId = `failed-${userId}-${ticker}-${date}-${Date.now()}`;
 
-      // Create or update entry in agent_reports table with status "fail"
+      // Create or update entry in agent_reports table with status "failed"
       await db.agent_reports.upsert({
         where: {
           session_id: failureSessionId,
         },
         update: {
-          status: "fail",
+          status: "failed",
           updated_at: new Date(),
         },
         create: {
@@ -114,7 +114,7 @@ export const generateAnalysis = inngest.createFunction(
           ticker,
           analysis_date: new Date(date),
           userId,
-          status: "fail",
+          status: "failed",
         },
       });
       throw new Error(`Analysis request failed: ${response.statusText}`);

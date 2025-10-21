@@ -1,16 +1,19 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
-  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
   IconDotsVertical,
-  IconLayoutColumns,
   IconRefresh,
-} from "@tabler/icons-react"
+  IconLoader2,
+  IconCheck,
+  IconX,
+  IconAlertTriangle,
+} from "@tabler/icons-react";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -24,13 +27,13 @@ import {
   type SortingState,
   useReactTable,
   type VisibilityState,
-} from "@tanstack/react-table"
-import { z } from "zod"
-import { toast } from "sonner"
+} from "@tanstack/react-table";
+import { z } from "zod";
+import { toast } from "sonner";
 
-import { Badge } from "~/components/ui/badge"
-import { Button } from "~/components/ui/button"
-import { Checkbox } from "~/components/ui/checkbox"
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -38,23 +41,22 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog"
+} from "~/components/ui/dialog";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu"
-import { Label } from "~/components/ui/label"
+} from "~/components/ui/dropdown-menu";
+import { Label } from "~/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select"
+} from "~/components/ui/select";
 import {
   Table,
   TableBody,
@@ -62,33 +64,53 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "~/components/ui/table"
-import { 
+} from "~/components/ui/table";
+import { ProgressButton } from "~/components/progress-button";
+import {
   getAgentReports,
   updateReportPublished,
   deleteReport,
-  addOptimisticReport as addOptimisticReportAction,
-  type AgentReportRow 
-} from "~/actions/agent-reports"
+  type AgentReportRow,
+} from "~/actions/agent-reports";
 
 // Re-export the type for external use
-export type { AgentReportRow } from "~/actions/agent-reports"
+export type { AgentReportRow } from "~/actions/agent-reports";
 
 // Team configuration for analyst tags
 const teamConfig = {
-  market: { label: 'Market', variant: 'default' as const },
-  news: { label: 'News', variant: 'secondary' as const },
-  fundamentals: { label: 'Fundamentals', variant: 'outline' as const },
-  social: { label: 'Social', variant: 'destructive' as const }
-} as const
+  market: { label: "Market", variant: "default" as const },
+  news: { label: "News", variant: "secondary" as const },
+  fundamentals: { label: "Fundamentals", variant: "outline" as const },
+  social: { label: "Social", variant: "destructive" as const },
+} as const;
 
 // Status configuration for status badges
 const statusConfig = {
-  processing: { label: 'In Progress', variant: 'secondary' as const },
-  done: { label: 'Complete', variant: 'default' as const },
-  failed: { label: 'Failed', variant: 'destructive' as const },
-  NEC: { label: 'Not Enough Coverage', variant: 'outline' as const }
-} as const
+  processing: {
+    label: "In Progress",
+    variant: "secondary" as const,
+    icon: IconLoader2,
+    iconClassName: "animate-spin",
+  },
+  done: {
+    label: "Complete",
+    variant: "default" as const,
+    icon: IconCheck,
+    iconClassName: "",
+  },
+  failed: {
+    label: "Failed",
+    variant: "destructive" as const,
+    icon: IconX,
+    iconClassName: "",
+  },
+  NEC: {
+    label: "Not Enough Coverage",
+    variant: "outline" as const,
+    icon: IconAlertTriangle,
+    iconClassName: "",
+  },
+} as const;
 
 // Define the schema for agent report data
 export const agentReportSchema = z.object({
@@ -96,47 +118,52 @@ export const agentReportSchema = z.object({
   ticker: z.string(),
   analysisDate: z.date(),
   recommendation: z.string(),
-  status: z.enum(['processing', 'done', 'failed', 'NEC']),
+  status: z.enum(["processing", "done", "failed", "NEC"]),
   published: z.boolean(),
   analystTeams: z.array(z.string()),
-})
+});
 
 interface ReportDataTableProps {
-  userId: string
-  className?: string
-  onOptimisticReportAdd?: (addOptimisticReport: (ticker: string, sessionId: string) => Promise<string>) => void
-  onOptimisticReportUpdate?: (updateOptimisticReport: (reportId: string, updatedData: Partial<AgentReportRow>) => void) => void
+  userId: string;
+  className?: string;
+  onOptimisticReportAdd?: (
+    addOptimisticReport: (ticker: string, sessionId: string) => Promise<string>,
+  ) => void;
+  onOptimisticReportUpdate?: (
+    updateOptimisticReport: (
+      reportId: string,
+      updatedData: Partial<AgentReportRow>,
+    ) => void,
+  ) => void;
 }
 
 // Animated table row component
 const AnimatedTableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement> & {
-    isAnimating?: boolean
-    isOptimistic?: boolean
+    isAnimating?: boolean;
+    isOptimistic?: boolean;
   }
 >(({ className, isAnimating, isOptimistic, ...props }, ref) => {
   return (
     <TableRow
       ref={ref}
-      className={`
-        ${className ?? ''}
-        ${isAnimating ? 'animate-slide-down opacity-0' : ''}
-        ${isOptimistic ? 'bg-muted/30' : ''}
-      `}
+      className={` ${className ?? ""} ${isAnimating ? "animate-slide-down opacity-0" : ""} ${isOptimistic ? "bg-muted/30" : ""} `}
       style={{
-        animation: isAnimating ? 'slideDown 300ms ease-out forwards' : undefined,
+        animation: isAnimating
+          ? "slideDown 300ms ease-out forwards"
+          : undefined,
       }}
       {...props}
     />
-  )
-})
-AnimatedTableRow.displayName = "AnimatedTableRow"
+  );
+});
+AnimatedTableRow.displayName = "AnimatedTableRow";
 
 // Create columns with action handlers
 const createColumns = (
-  onUnpublish: (id: string, ticker: string) => void,
-  onDelete: (id: string, ticker: string) => void
+  onTogglePublish: (id: string, ticker: string, published: boolean) => void,
+  onDelete: (id: string, ticker: string) => void,
 ): ColumnDef<AgentReportRow>[] => [
   {
     id: "select",
@@ -168,9 +195,7 @@ const createColumns = (
     accessorKey: "ticker",
     header: "Name",
     cell: ({ row }) => (
-      <div className="font-medium text-foreground">
-        {row.original.ticker}
-      </div>
+      <div className="text-foreground font-medium">{row.original.ticker}</div>
     ),
     enableHiding: false,
     enableSorting: true,
@@ -182,16 +207,16 @@ const createColumns = (
       <div className="flex flex-wrap gap-1">
         {row.original.analystTeams.length > 0 ? (
           row.original.analystTeams.map((team) => {
-            const config = teamConfig[team as keyof typeof teamConfig]
+            const config = teamConfig[team as keyof typeof teamConfig];
             return (
-              <Badge 
-                key={team} 
-                variant={config?.variant ?? 'outline'} 
-                className="text-xs px-2 py-0.5"
+              <Badge
+                key={team}
+                variant={config?.variant ?? "outline"}
+                className="px-2 py-0.5 text-xs"
               >
                 {config?.label ?? team}
               </Badge>
-            )
+            );
           })
         ) : (
           <span className="text-muted-foreground text-xs">No teams</span>
@@ -204,27 +229,45 @@ const createColumns = (
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
-      const config = statusConfig[row.original.status]
+      const config = statusConfig[row.original.status];
+      const IconComponent = config.icon;
       return (
-        <Badge 
-          variant={config.variant} 
-          className="text-xs px-2 py-0.5 whitespace-nowrap"
+        <Badge
+          variant={config.variant}
+          className="flex items-center gap-1 px-2 py-0.5 text-xs whitespace-nowrap"
         >
+          <IconComponent className={`size-3 ${config.iconClassName}`} />
           {config.label}
         </Badge>
-      )
+      );
     },
     enableSorting: true,
+    sortingFn: (rowA, rowB) => {
+      // Define status priority: processing > failed > NEC > done
+      const statusPriority = {
+        processing: 0,
+        failed: 1,
+        NEC: 2,
+        done: 3,
+      };
+      const priorityA =
+        statusPriority[rowA.original.status as keyof typeof statusPriority] ??
+        999;
+      const priorityB =
+        statusPriority[rowB.original.status as keyof typeof statusPriority] ??
+        999;
+      return priorityA - priorityB;
+    },
   },
   {
     accessorKey: "analysisDate",
     header: "Analysis Date",
     cell: ({ row }) => (
-      <div className="text-sm text-muted-foreground whitespace-nowrap">
-        {row.original.analysisDate.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
+      <div className="text-muted-foreground text-sm whitespace-nowrap">
+        {row.original.analysisDate.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
         })}
       </div>
     ),
@@ -234,13 +277,13 @@ const createColumns = (
     accessorKey: "updatedAt",
     header: "Updated",
     cell: ({ row }) => (
-      <div className="text-sm text-muted-foreground whitespace-nowrap">
-        {row.original.updatedAt.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+      <div className="text-muted-foreground text-sm whitespace-nowrap">
+        {row.original.updatedAt.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
         })}
       </div>
     ),
@@ -249,12 +292,32 @@ const createColumns = (
   {
     accessorKey: "recommendation",
     header: "Recommendation",
-    cell: ({ row }) => (
-      <div className="max-w-48 truncate text-sm" title={row.original.recommendation}>
-        {row.original.recommendation ?? 'No recommendation'}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const { recommendation, status, id, ticker } = row.original;
+
+      // Show progress button if recommendation is null/empty and status is processing
+      if (
+        (!recommendation || recommendation.trim() === "") &&
+        status === "processing"
+      ) {
+        return <ProgressButton reportId={id} ticker={ticker} />;
+      }
+
+      // Show normal recommendation text
+      return (
+        <div className="max-w-48 truncate text-sm" title={recommendation}>
+          {recommendation ?? "No recommendation"}
+        </div>
+      );
+    },
     enableSorting: false,
+    filterFn: (row, id, value) => {
+      const recommendation = row.getValue(id) as string;
+      if (!recommendation || recommendation.trim() === "") {
+        return false; // Don't show rows without recommendations in filter results
+      }
+      return recommendation === value; // Exact match for database values
+    },
   },
   {
     id: "actions",
@@ -271,12 +334,20 @@ const createColumns = (
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem onClick={() => onUnpublish(row.original.id, row.original.ticker)}>
-            Unpublish
+          <DropdownMenuItem
+            onClick={() =>
+              onTogglePublish(
+                row.original.id,
+                row.original.ticker,
+                row.original.published,
+              )
+            }
+          >
+            {row.original.published ? "Unpublish" : "Publish"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            variant="destructive" 
+          <DropdownMenuItem
+            variant="destructive"
             onClick={() => onDelete(row.original.id, row.original.ticker)}
           >
             Remove
@@ -285,216 +356,287 @@ const createColumns = (
       </DropdownMenu>
     ),
   },
-]
+];
 
-export function ReportDataTable({ 
-  userId, 
-  className, 
-  onOptimisticReportAdd, 
-  onOptimisticReportUpdate 
+export function ReportDataTable({
+  userId,
+  className,
+  onOptimisticReportAdd,
+  onOptimisticReportUpdate,
 }: ReportDataTableProps) {
+  // Navigation
+  const router = useRouter();
+
   // State management
-  const [data, setData] = React.useState<AgentReportRow[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-  const [refreshing, setRefreshing] = React.useState(false)
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [data, setData] = React.useState<AgentReportRow[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [rowSelection, setRowSelection] = React.useState({});
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  );
   const [sorting, setSorting] = React.useState<SortingState>([
-    { id: 'updatedAt', desc: true },
-    { id: 'analysisDate', desc: true }
-  ])
+    { id: "updatedAt", desc: true },
+    { id: "status", desc: false }, // processing first, then failed, NEC, done
+    { id: "analysisDate", desc: true },
+  ]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
-  })
+  });
 
   // Animation state for new rows
-  const [animatingRows, setAnimatingRows] = React.useState<Set<string>>(new Set())
-  const [optimisticRows, setOptimisticRows] = React.useState<Set<string>>(new Set())
+  const [animatingRows, setAnimatingRows] = React.useState<Set<string>>(
+    new Set(),
+  );
+  const [optimisticRows, setOptimisticRows] = React.useState<Set<string>>(
+    new Set(),
+  );
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = React.useState<{
-    open: boolean
-    type: 'delete' | 'unpublish'
-    reportId: string
-    ticker: string
+    open: boolean;
+    type: "delete" | "publish" | "unpublish";
+    reportId: string;
+    ticker: string;
   }>({
     open: false,
-    type: 'delete',
-    reportId: '',
-    ticker: '',
-  })
+    type: "delete",
+    reportId: "",
+    ticker: "",
+  });
 
   // Data fetching function
   const fetchData = React.useCallback(async () => {
     try {
-      setError(null)
-      const reports = await getAgentReports(userId)
-      setData(reports)
+      setError(null);
+      const reports = await getAgentReports(userId);
+      setData(reports);
+
+      // Clear optimistic rows when fetching fresh data (e.g., on refresh)
+      setOptimisticRows(new Set());
+      setAnimatingRows(new Set());
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch reports'
-      setError(errorMessage)
-      toast.error('Failed to load analysis reports')
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch reports";
+      setError(errorMessage);
+      toast.error("Failed to load analysis reports");
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      setLoading(false);
+      setRefreshing(false);
     }
-  }, [userId])
+  }, [userId]);
 
   // Initial data fetch
   React.useEffect(() => {
-    void fetchData()
-  }, [fetchData])
+    void fetchData();
+  }, [fetchData]);
 
   // Handle confirmation dialog actions
-  const openConfirmDialog = React.useCallback((type: 'delete' | 'unpublish', reportId: string, ticker: string) => {
-    setConfirmDialog({
-      open: true,
-      type,
-      reportId,
-      ticker,
-    })
-  }, [])
+  const openConfirmDialog = React.useCallback(
+    (
+      type: "delete" | "publish" | "unpublish",
+      reportId: string,
+      ticker: string,
+    ) => {
+      setConfirmDialog({
+        open: true,
+        type,
+        reportId,
+        ticker,
+      });
+    },
+    [],
+  );
 
   const closeConfirmDialog = React.useCallback(() => {
-    setConfirmDialog(prev => ({ ...prev, open: false }))
-  }, [])
+    setConfirmDialog((prev) => ({ ...prev, open: false }));
+  }, []);
 
   // Handle row actions
-  const handleUnpublish = React.useCallback(async (reportId: string) => {
-    try {
-      await updateReportPublished(reportId, false)
-      toast.success('Report unpublished successfully')
-      // Optimistically update the local state
-      setData(prevData => 
-        prevData.map(report => 
-          report.id === reportId 
-            ? { ...report, published: false }
-            : report
-        )
-      )
-    } catch (err) {
-      toast.error('Failed to unpublish report')
-      console.error('Error unpublishing report:', err)
-    } finally {
-      closeConfirmDialog()
-    }
-  }, [closeConfirmDialog])
+  const handleTogglePublish = React.useCallback(
+    async (reportId: string, currentPublished: boolean) => {
+      const newPublished = !currentPublished;
+      try {
+        await updateReportPublished(reportId, newPublished);
+        toast.success(
+          `Report ${newPublished ? "published" : "unpublished"} successfully`,
+        );
+        // Optimistically update the local state
+        setData((prevData) =>
+          prevData.map((report) =>
+            report.id === reportId
+              ? { ...report, published: newPublished }
+              : report,
+          ),
+        );
+      } catch (err) {
+        toast.error(
+          `Failed to ${newPublished ? "publish" : "unpublish"} report`,
+        );
+        console.error(
+          `Error ${newPublished ? "publishing" : "unpublishing"} report:`,
+          err,
+        );
+      } finally {
+        closeConfirmDialog();
+      }
+    },
+    [closeConfirmDialog],
+  );
 
-  const handleDelete = React.useCallback(async (reportId: string) => {
-    try {
-      await deleteReport(reportId)
-      toast.success('Report deleted successfully')
-      // Optimistically remove from local state
-      setData(prevData => prevData.filter(report => report.id !== reportId))
-    } catch (err) {
-      toast.error('Failed to delete report')
-      console.error('Error deleting report:', err)
-    } finally {
-      closeConfirmDialog()
-    }
-  }, [closeConfirmDialog])
+  const handleDelete = React.useCallback(
+    async (reportId: string) => {
+      try {
+        await deleteReport(reportId);
+        toast.success("Report deleted successfully");
+        // Optimistically remove from local state
+        setData((prevData) =>
+          prevData.filter((report) => report.id !== reportId),
+        );
+      } catch (err) {
+        toast.error("Failed to delete report");
+        console.error("Error deleting report:", err);
+      } finally {
+        closeConfirmDialog();
+      }
+    },
+    [closeConfirmDialog],
+  );
 
   const handleConfirmAction = React.useCallback(async () => {
-    if (confirmDialog.type === 'delete') {
-      await handleDelete(confirmDialog.reportId)
-    } else if (confirmDialog.type === 'unpublish') {
-      await handleUnpublish(confirmDialog.reportId)
+    if (confirmDialog.type === "delete") {
+      await handleDelete(confirmDialog.reportId);
+    } else if (
+      confirmDialog.type === "publish" ||
+      confirmDialog.type === "unpublish"
+    ) {
+      const currentPublished = confirmDialog.type === "unpublish";
+      await handleTogglePublish(confirmDialog.reportId, currentPublished);
     }
-  }, [confirmDialog, handleDelete, handleUnpublish])
+  }, [confirmDialog, handleDelete, handleTogglePublish]);
 
   // Handle refresh
   const handleRefresh = React.useCallback(async () => {
-    setRefreshing(true)
-    await fetchData()
-  }, [fetchData])
+    setRefreshing(true);
+    await fetchData();
+  }, [fetchData]);
+
+  // Handle row click navigation
+  const handleRowClick = React.useCallback(
+    (sessionId: string, event: React.MouseEvent) => {
+      // Prevent navigation if clicking on buttons or interactive elements
+      const target = event.target as HTMLElement;
+      if (
+        target.closest("button") ||
+        target.closest('[role="button"]') ||
+        target.closest("a")
+      ) {
+        return;
+      }
+      router.push(`/document/${sessionId}`);
+    },
+    [router],
+  );
 
   // Add optimistic report for new analysis
-  const addOptimisticReport = React.useCallback(async (ticker: string, sessionId: string) => {
-    try {
-      // Create optimistic report entry
-      const reportId = await addOptimisticReportAction(ticker, userId, sessionId)
-      
-      // Create optimistic row data
-      const optimisticRow: AgentReportRow = {
-        id: reportId,
-        ticker,
-        analysisDate: new Date(),
-        updatedAt: new Date(),
-        recommendation: '',
-        status: 'processing',
-        published: false,
-        analystTeams: [],
-        sessionId,
-        userId,
-      }
+  const addOptimisticReport = React.useCallback(
+    async (ticker: string, sessionId: string) => {
+      try {
+        // Generate a temporary ID for the optimistic row (client-side only)
+        const reportId = `optimistic_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-      // Add to optimistic rows set
-      setOptimisticRows(prev => new Set(prev).add(reportId))
-      
-      // Add to animating rows set for animation
-      setAnimatingRows(prev => new Set(prev).add(reportId))
-      
-      // Add to data at the beginning of the array
-      setData(prevData => [optimisticRow, ...prevData])
-      
-      // Remove from animating rows after animation completes
-      setTimeout(() => {
-        setAnimatingRows(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(reportId)
-          return newSet
-        })
-      }, 300) // Animation duration
-      
-      return reportId
-    } catch (error) {
-      console.error('Error adding optimistic report:', error)
-      toast.error('Failed to start analysis')
-      throw error
-    }
-  }, [userId])
+        // Create optimistic row data (UI-only, not persisted to database)
+        const optimisticRow: AgentReportRow = {
+          id: reportId,
+          ticker,
+          analysisDate: new Date(),
+          updatedAt: new Date(),
+          recommendation: "",
+          status: "processing",
+          published: false,
+          analystTeams: [],
+          sessionId,
+          userId,
+        };
+
+        // Add to optimistic rows set
+        setOptimisticRows((prev) => new Set(prev).add(reportId));
+
+        // Add to animating rows set for animation
+        setAnimatingRows((prev) => new Set(prev).add(reportId));
+
+        // Add to data at the beginning of the array
+        setData((prevData) => [optimisticRow, ...prevData]);
+
+        // Remove from animating rows after animation completes
+        setTimeout(() => {
+          setAnimatingRows((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(reportId);
+            return newSet;
+          });
+        }, 300); // Animation duration
+
+        return reportId;
+      } catch (error) {
+        console.error("Error adding optimistic report:", error);
+        toast.error("Failed to start analysis");
+        throw error;
+      }
+    },
+    [userId],
+  );
 
   // Update optimistic report when analysis completes
-  const updateOptimisticReport = React.useCallback((reportId: string, updatedData: Partial<AgentReportRow>) => {
-    setData(prevData => 
-      prevData.map(report => 
-        report.id === reportId 
-          ? { ...report, ...updatedData }
-          : report
-      )
-    )
-    
-    // Remove from optimistic rows set if analysis is complete
-    if (updatedData.status && updatedData.status !== 'processing') {
-      setOptimisticRows(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(reportId)
-        return newSet
-      })
-    }
-  }, [])
+  const updateOptimisticReport = React.useCallback(
+    (reportId: string, updatedData: Partial<AgentReportRow>) => {
+      setData((prevData) =>
+        prevData.map((report) =>
+          report.id === reportId ? { ...report, ...updatedData } : report,
+        ),
+      );
+
+      // Remove from optimistic rows set if analysis is complete
+      if (updatedData.status && updatedData.status !== "processing") {
+        setOptimisticRows((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(reportId);
+          return newSet;
+        });
+      }
+    },
+    [],
+  );
 
   // Expose optimistic update functions to parent component
   React.useEffect(() => {
     if (onOptimisticReportAdd) {
-      onOptimisticReportAdd(addOptimisticReport)
+      onOptimisticReportAdd(addOptimisticReport);
     }
     if (onOptimisticReportUpdate) {
-      onOptimisticReportUpdate(updateOptimisticReport)
+      onOptimisticReportUpdate(updateOptimisticReport);
     }
-  }, [addOptimisticReport, updateOptimisticReport, onOptimisticReportAdd, onOptimisticReportUpdate])
+  }, [
+    addOptimisticReport,
+    updateOptimisticReport,
+    onOptimisticReportAdd,
+    onOptimisticReportUpdate,
+  ]);
 
   // Create columns with handlers
   const columns = React.useMemo(
-    () => createColumns(
-      (id: string, ticker: string) => openConfirmDialog('unpublish', id, ticker), 
-      (id: string, ticker: string) => openConfirmDialog('delete', id, ticker)
-    ),
-    [openConfirmDialog]
-  )
+    () =>
+      createColumns(
+        (id: string, ticker: string, published: boolean) =>
+          openConfirmDialog(published ? "unpublish" : "publish", id, ticker),
+        (id: string, ticker: string) => openConfirmDialog("delete", id, ticker),
+      ),
+    [openConfirmDialog],
+  );
 
   const table = useReactTable({
     data,
@@ -514,36 +656,38 @@ export function ReportDataTable({
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-  })
-
-
+  });
 
   if (loading) {
     return (
-      <div className={`w-full flex-col justify-start gap-6 ${className ?? ''}`}>
+      <div
+        className={`flex w-full flex-col justify-start gap-6 ${className ?? ""}`}
+      >
         <div className="flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold">Analysis Reports</h2>
           </div>
         </div>
-        <div className="flex items-center justify-center h-32">
+        <div className="flex h-32 items-center justify-center">
           <div className="text-muted-foreground flex items-center gap-2">
-            <IconRefresh className="animate-spin size-4" />
+            <IconRefresh className="size-4 animate-spin" />
             Loading analysis reports...
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
     return (
-      <div className={`w-full flex-col justify-start gap-6 ${className ?? ''}`}>
+      <div
+        className={`flex w-full flex-col justify-start gap-6 ${className ?? ""}`}
+      >
         <div className="flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold">Analysis Reports</h2>
@@ -553,57 +697,74 @@ export function ReportDataTable({
             <span className="hidden lg:inline">Retry</span>
           </Button>
         </div>
-        <div className="flex flex-col items-center justify-center h-32 gap-2">
+        <div className="flex h-32 flex-col items-center justify-center gap-2">
           <div className="text-destructive">Failed to load reports</div>
           <div className="text-muted-foreground text-sm">{error}</div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className={`w-full flex-col justify-start gap-6 ${className ?? ''}`}>
+    <div
+      className={`flex w-full flex-col justify-start gap-2 ${className ?? ""}`}
+    >
       <div className="flex items-center justify-between px-4 lg:px-6">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">Analysis Reports</h2>
+          <h2 className="text-lg font-semibold">Analysis Reports 📖</h2>
         </div>
         <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Customize Columns</span>
-                <span className="lg:hidden">Columns</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          {/* Status Filter */}
+          <Select
+            value={
+              (table.getColumn("status")?.getFilterValue() as string) ?? "all"
+            }
+            onValueChange={(value) => {
+              table
+                .getColumn("status")
+                ?.setFilterValue(value === "all" ? undefined : value);
+            }}
+          >
+            <SelectTrigger className="w-auto max-w-[200px] min-w-[80px] rounded-full border-0 bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 focus:bg-gray-200 [&_*[data-slot=select-value]]:line-clamp-none [&_*[data-slot=select-value]]:whitespace-nowrap">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="processing">In Progress</SelectItem>
+              <SelectItem value="done">Complete</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="NEC">Not Enough Coverage</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Recommendation Filter */}
+          <Select
+            value={
+              (table.getColumn("recommendation")?.getFilterValue() as string) ??
+              "all"
+            }
+            onValueChange={(value) => {
+              table
+                .getColumn("recommendation")
+                ?.setFilterValue(value === "all" ? undefined : value);
+            }}
+          >
+            <SelectTrigger className="w-auto max-w-[220px] min-w-[80px] rounded-full border-0 bg-gray-100 px-4 py-2 transition-colors hover:bg-gray-200 focus:bg-gray-200 [&_*[data-slot=select-value]]:line-clamp-none [&_*[data-slot=select-value]]:whitespace-nowrap">
+              <SelectValue placeholder="All Recommendations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Recommendations</SelectItem>
+              <SelectItem value="BUY">BUY</SelectItem>
+              <SelectItem value="SELL">SELL</SelectItem>
+              <SelectItem value="HOLD">HOLD</SelectItem>
+              <SelectItem value="BUY or HOLD">BUY or HOLD</SelectItem>
+              <SelectItem value="SELL or HOLD">SELL or HOLD</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
           >
@@ -614,7 +775,7 @@ export function ReportDataTable({
           </Button>
         </div>
       </div>
-      
+
       <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
           <Table>
@@ -628,10 +789,10 @@ export function ReportDataTable({
                           ? null
                           : flexRender(
                               header.column.columnDef.header,
-                              header.getContext()
+                              header.getContext(),
                             )}
                       </TableHead>
-                    )
+                    );
                   })}
                 </TableRow>
               ))}
@@ -639,23 +800,30 @@ export function ReportDataTable({
             <TableBody>
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => {
-                  const isAnimating = animatingRows.has(row.id)
-                  const isOptimistic = optimisticRows.has(row.id)
-                  
+                  const isAnimating = animatingRows.has(row.id);
+                  const isOptimistic = optimisticRows.has(row.id);
+
                   return (
                     <AnimatedTableRow
                       key={row.id}
                       data-state={row.getIsSelected() && "selected"}
                       isAnimating={isAnimating}
                       isOptimistic={isOptimistic}
+                      onClick={(event) =>
+                        handleRowClick(row.original.sessionId, event)
+                      }
+                      className="hover:bg-muted/50 cursor-pointer transition-colors"
                     >
                       {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
                         </TableCell>
                       ))}
                     </AnimatedTableRow>
-                  )
+                  );
                 })
               ) : (
                 <TableRow>
@@ -670,7 +838,7 @@ export function ReportDataTable({
             </TableBody>
           </Table>
         </div>
-        
+
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
             {table.getFilteredSelectedRowModel().rows.length} of{" "}
@@ -684,10 +852,14 @@ export function ReportDataTable({
               <Select
                 value={`${table.getState().pagination.pageSize}`}
                 onValueChange={(value) => {
-                  table.setPageSize(Number(value))
+                  table.setPageSize(Number(value));
                 }}
               >
-                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
+                <SelectTrigger
+                  size="sm"
+                  className="w-20 rounded-full border-0 bg-gray-100 px-3 py-1 transition-colors hover:bg-gray-200 focus:bg-gray-200"
+                  id="rows-per-page"
+                >
                   <SelectValue
                     placeholder={table.getState().pagination.pageSize}
                   />
@@ -755,28 +927,39 @@ export function ReportDataTable({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {confirmDialog.type === 'delete' ? 'Delete Report' : 'Unpublish Report'}
+              {confirmDialog.type === "delete"
+                ? "Delete Report"
+                : confirmDialog.type === "publish"
+                  ? "Publish Report"
+                  : "Unpublish Report"}
             </DialogTitle>
             <DialogDescription>
-              {confirmDialog.type === 'delete' 
+              {confirmDialog.type === "delete"
                 ? `Are you sure you want to permanently delete the analysis report for ${confirmDialog.ticker}? This action cannot be undone.`
-                : `Are you sure you want to unpublish the analysis report for ${confirmDialog.ticker}? This will make it no longer visible to others.`
-              }
+                : confirmDialog.type === "publish"
+                  ? `Are you sure you want to publish the analysis report for ${confirmDialog.ticker}? This will make it visible to others.`
+                  : `Are you sure you want to unpublish the analysis report for ${confirmDialog.ticker}? This will make it no longer visible to others.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={closeConfirmDialog}>
               Cancel
             </Button>
-            <Button 
-              variant={confirmDialog.type === 'delete' ? 'destructive' : 'default'}
+            <Button
+              variant={
+                confirmDialog.type === "delete" ? "destructive" : "default"
+              }
               onClick={handleConfirmAction}
             >
-              {confirmDialog.type === 'delete' ? 'Delete' : 'Unpublish'}
+              {confirmDialog.type === "delete"
+                ? "Delete"
+                : confirmDialog.type === "publish"
+                  ? "Publish"
+                  : "Unpublish"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

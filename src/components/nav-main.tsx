@@ -1,31 +1,40 @@
-"use client"
+"use client";
 
-import { IconCirclePlusFilled, IconCalendarTime, type Icon } from "@tabler/icons-react"
-import { useRouter } from "next/navigation"
+import {
+  IconCirclePlusFilled,
+  IconCalendarTime,
+  type Icon,
+} from "@tabler/icons-react";
+import { useRouter } from "next/navigation";
 
-import { Button } from "~/components/ui/button"
+import { Button } from "~/components/ui/button";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "~/components/ui/sidebar"
+} from "~/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 export function NavMain({
   items,
 }: {
   items: {
-    title: string
-    url: string
-    icon?: Icon
-  }[]
+    title: string;
+    url: string;
+    icon?: Icon;
+  }[];
 }) {
-  const router = useRouter()
+  const router = useRouter();
 
   const handleStartAnalysis = () => {
-    router.push("/")
-  }
+    router.push("/");
+  };
 
   return (
     <SidebarGroup>
@@ -40,14 +49,20 @@ export function NavMain({
               <IconCirclePlusFilled />
               <span>Start Analysis</span>
             </SidebarMenuButton>
-            <Button
-              size="icon"
-              className="size-8 group-data-[collapsible=icon]:opacity-0"
-              variant="outline"
-            >
-              <IconCalendarTime />
-              <span className="sr-only">Inbox</span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  className="size-8 group-data-[collapsible=icon]:opacity-0"
+                  variant="outline"
+                >
+                  <IconCalendarTime />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Automate your stock analytics — coming soon</p>
+              </TooltipContent>
+            </Tooltip>
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
@@ -62,5 +77,5 @@ export function NavMain({
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
-  )
+  );
 }

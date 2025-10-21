@@ -38,10 +38,24 @@ const analysts: Analyst[] = [
   { id: "fundamentals", label: "Fundamentals" },
 ];
 
-const AnalysisSearchCard = () => {
+interface AnalysisSearchCardProps {
+  onOptimisticReportAdd?:
+    | ((ticker: string, sessionId: string) => Promise<string>)
+    | null;
+}
+
+const AnalysisSearchCard = ({
+  onOptimisticReportAdd,
+}: AnalysisSearchCardProps) => {
   const [formData, setFormData] = useState<FormData>({
     ticker: "",
-    analyze_date: new Date().toISOString().split("T")[0] || "",
+    analyze_date: (() => {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const day = String(today.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    })(),
     analysts: [],
   });
 
@@ -80,7 +94,10 @@ const AnalysisSearchCard = () => {
     setIsAnalyzing(true);
 
     try {
-      // Queue the analysis using the server action
+      // Generate a session ID for tracking
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+      // Queue the analysis using the server action first
       const result = await queueAnalysisReport({
         ticker: formData.ticker,
         date: formData.analyze_date,
@@ -88,15 +105,44 @@ const AnalysisSearchCard = () => {
         published: true,
       });
 
+      // Add optimistic report to UI immediately if analysis was queued successfully
+      let reportId: string | undefined;
+      if (result.success && onOptimisticReportAdd) {
+        try {
+          reportId = await onOptimisticReportAdd(formData.ticker, sessionId);
+        } catch (error) {
+          console.error("Failed to add optimistic report:", error);
+          // Continue even if optimistic update fails
+        }
+      }
+
       if (result.success) {
         console.log("Analysis queued successfully:", result.eventId);
         toast.success(
           "🚀 Analysis started! This may take up to 4 minutes to complete.",
         );
-        // TODO: update UI table
+
+        // Clear the form
+        setFormData({
+          ticker: "",
+          analyze_date: (() => {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, "0");
+            const day = String(today.getDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+          })(),
+          analysts: [],
+        });
+
+        // Note: The optimistic row will stay in "processing" state until the actual analysis completes
+        // or the user refreshes the page (which will clear optimistic rows and fetch real data)
       } else {
         console.error("Failed to queue analysis:", result.message);
         toast.error("❌ Failed to start analysis. Please try again.");
+
+        // If analysis failed and we added an optimistic report, we should remove it
+        // For now, we'll let it stay as "processing" and the user can refresh
       }
     } catch (error) {
       console.error("Analysis failed:", error);
@@ -110,10 +156,10 @@ const AnalysisSearchCard = () => {
     <div className="p-6 md:p-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8">
-          <h1 className="mb-1 text-2xl font-semibold text-gray-900">
-            Analyze Stock
+          <h1 className="mb-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            Analyze Stock 📈
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Start a new stock analysis - results will appear below
           </p>
         </div>

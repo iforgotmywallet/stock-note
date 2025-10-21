@@ -10,6 +10,7 @@ import {
   IconMessageCircle,
   IconAlertTriangle,
   IconTarget,
+  IconRosetteDiscountCheckFilled,
 } from "@tabler/icons-react";
 
 import { Button } from "~/components/ui/button";
@@ -25,10 +26,14 @@ import { MarkdownRenderer } from "~/components/markdown-renderer";
 import type { StockData } from "~/types/stock-data";
 
 interface StockAnalysisDashboardProps {
+  reportData?: StockData;
+  sessionId?: string;
   className?: string;
 }
 
 export function StockAnalysisDashboard({
+  reportData,
+  sessionId,
   className,
 }: StockAnalysisDashboardProps) {
   const [activeTab, setActiveTab] = React.useState("overview");
@@ -36,17 +41,23 @@ export function StockAnalysisDashboard({
 
   // Load stock analysis data
   React.useEffect(() => {
-    const loadStockData = async () => {
-      try {
-        const response = await fetch("/pypl-dashboard-data.json");
-        const data = (await response.json()) as { data: StockData };
-        setStockData(data.data);
-      } catch (error) {
-        console.error("Failed to load stock analysis data:", error);
-      }
-    };
-    void loadStockData();
-  }, []);
+    if (reportData) {
+      // Use provided report data
+      setStockData(reportData);
+    } else {
+      // Fall back to static JSON for backward compatibility
+      const loadStockData = async () => {
+        try {
+          const response = await fetch("/pypl-dashboard-data.json");
+          const data = (await response.json()) as { data: StockData };
+          setStockData(data.data);
+        } catch (error) {
+          console.error("Failed to load stock analysis data:", error);
+        }
+      };
+      void loadStockData();
+    }
+  }, [reportData]);
 
   // Extract data from the loaded stock data
   const extractedData = React.useMemo(() => {
@@ -73,15 +84,42 @@ export function StockAnalysisDashboard({
     { id: "plan", label: "Plan", icon: IconTarget },
   ];
 
+  // Show loading state when no data is available
+  if (!stockData) {
+    return (
+      <div className={`bg-background min-h-screen ${className}`}>
+        <div className="container mx-auto max-w-7xl">
+          <div className="flex min-h-screen items-center justify-center">
+            <div className="space-y-4 text-center">
+              <div className="border-primary mx-auto h-12 w-12 animate-spin rounded-full border-b-2"></div>
+              <h2 className="text-xl font-semibold">Loading Analysis...</h2>
+              <p className="text-muted-foreground">
+                {sessionId
+                  ? `Loading report data for session ${sessionId}`
+                  : "Loading stock analysis data"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`bg-background min-h-screen ${className}`}>
       <div className="container mx-auto max-w-7xl">
         {/* Header Section */}
         <div className="mb-8 flex flex-col items-start justify-between sm:flex-row sm:items-center sm:px-6">
           <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold tracking-tight">
-              {stockData?.ticker ?? "LOADING"}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">
+                {stockData?.ticker ?? "LOADING"}
+              </h1>
+              <IconRosetteDiscountCheckFilled
+                className="h-5 w-5 text-blue-600 drop-shadow-sm"
+                title="Verified Report"
+              />
+            </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
               <span className="text-lg font-semibold">
                 {extractedData?.currentPrice ?? "Loading..."}
@@ -177,11 +215,18 @@ export function StockAnalysisDashboard({
                       sentiment evaluation.
                     </p>
                     {/* Display final recommendation from data */}
-                    {stockData?.analysis?.final_recommendation && (
+                    {stockData?.analysis?.final_recommendation ? (
                       <div className="mt-4">
                         <MarkdownRenderer
                           content={stockData.analysis.final_recommendation}
                         />
+                      </div>
+                    ) : (
+                      <div className="bg-muted mt-4 rounded-lg p-4">
+                        <p className="text-muted-foreground text-sm">
+                          Final recommendation analysis is not available for
+                          this report.
+                        </p>
                       </div>
                     )}
                   </div>
@@ -202,7 +247,7 @@ export function StockAnalysisDashboard({
               </div>
 
               {/* Technical Analysis Report */}
-              {stockData?.analysis?.market_report && (
+              {stockData?.analysis?.market_report ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>Technical Analysis Report</CardTitle>
@@ -215,6 +260,24 @@ export function StockAnalysisDashboard({
                     <MarkdownRenderer
                       content={stockData.analysis.market_report}
                     />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Technical Analysis Report</CardTitle>
+                    <CardDescription>
+                      Market analysis data is not available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-muted-foreground text-sm">
+                        Technical analysis data is not available for this
+                        report. This may be because the analysis is still in
+                        progress or the data could not be retrieved.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -233,7 +296,7 @@ export function StockAnalysisDashboard({
               </div>
 
               {/* Sentiment Analysis Report */}
-              {stockData?.analysis?.sentiment_report && (
+              {stockData?.analysis?.sentiment_report ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>Sentiment Analysis Report</CardTitle>
@@ -248,6 +311,24 @@ export function StockAnalysisDashboard({
                     />
                   </CardContent>
                 </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Sentiment Analysis Report</CardTitle>
+                    <CardDescription>
+                      Sentiment analysis data is not available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-muted-foreground text-sm">
+                        Sentiment analysis data is not available for this
+                        report. This may be because the analysis is still in
+                        progress or the data could not be retrieved.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
           </TabsContent>
@@ -259,12 +340,13 @@ export function StockAnalysisDashboard({
                   Latest News
                 </h2>
                 <p className="text-muted-foreground">
-                  Recent news and updates affecting PYPL
+                  Recent news and updates affecting{" "}
+                  {stockData?.ticker ?? "this stock"}
                 </p>
               </div>
 
               {/* News Analysis Report */}
-              {stockData?.analysis?.news_report && (
+              {stockData?.analysis?.news_report ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>News Analysis Report</CardTitle>
@@ -277,6 +359,24 @@ export function StockAnalysisDashboard({
                     <MarkdownRenderer
                       content={stockData.analysis.news_report}
                     />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>News Analysis Report</CardTitle>
+                    <CardDescription>
+                      News analysis data is not available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-muted-foreground text-sm">
+                        News analysis data is not available for this report.
+                        This may be because the analysis is still in progress or
+                        the data could not be retrieved.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -295,7 +395,7 @@ export function StockAnalysisDashboard({
               </div>
 
               {/* Fundamentals Analysis Report */}
-              {stockData?.analysis?.fundamentals_report && (
+              {stockData?.analysis?.fundamentals_report ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>Fundamentals Analysis Report</CardTitle>
@@ -308,6 +408,24 @@ export function StockAnalysisDashboard({
                     <MarkdownRenderer
                       content={stockData.analysis.fundamentals_report}
                     />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Fundamentals Analysis Report</CardTitle>
+                    <CardDescription>
+                      Fundamentals analysis data is not available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-muted-foreground text-sm">
+                        Fundamentals analysis data is not available for this
+                        report. This may be because the analysis is still in
+                        progress or the data could not be retrieved.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -326,7 +444,7 @@ export function StockAnalysisDashboard({
               </div>
 
               {/* Investment Debate */}
-              {stockData?.analysis?.investment_debate && (
+              {stockData?.analysis?.investment_debate ? (
                 <div className="space-y-6">
                   <Card>
                     <CardHeader>
@@ -336,11 +454,19 @@ export function StockAnalysisDashboard({
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer
-                        content={
-                          stockData.analysis.investment_debate.bull_analysis
-                        }
-                      />
+                      {stockData.analysis.investment_debate.bull_analysis ? (
+                        <MarkdownRenderer
+                          content={
+                            stockData.analysis.investment_debate.bull_analysis
+                          }
+                        />
+                      ) : (
+                        <div className="bg-muted rounded-lg p-4">
+                          <p className="text-muted-foreground text-sm">
+                            Bull analysis is not available for this report.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -352,11 +478,19 @@ export function StockAnalysisDashboard({
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer
-                        content={
-                          stockData.analysis.investment_debate.bear_analysis
-                        }
-                      />
+                      {stockData.analysis.investment_debate.bear_analysis ? (
+                        <MarkdownRenderer
+                          content={
+                            stockData.analysis.investment_debate.bear_analysis
+                          }
+                        />
+                      ) : (
+                        <div className="bg-muted rounded-lg p-4">
+                          <p className="text-muted-foreground text-sm">
+                            Bear analysis is not available for this report.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -368,14 +502,40 @@ export function StockAnalysisDashboard({
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer
-                        content={
-                          stockData.analysis.investment_debate.judge_decision
-                        }
-                      />
+                      {stockData.analysis.investment_debate.judge_decision ? (
+                        <MarkdownRenderer
+                          content={
+                            stockData.analysis.investment_debate.judge_decision
+                          }
+                        />
+                      ) : (
+                        <div className="bg-muted rounded-lg p-4">
+                          <p className="text-muted-foreground text-sm">
+                            Judge decision is not available for this report.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Investment Debate</CardTitle>
+                    <CardDescription>
+                      Investment debate data is not available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-muted-foreground text-sm">
+                        Investment debate analysis is not available for this
+                        report. This may be because the analysis is still in
+                        progress or the data could not be retrieved.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
           </TabsContent>
@@ -392,7 +552,7 @@ export function StockAnalysisDashboard({
               </div>
 
               {/* Risk Assessment */}
-              {stockData?.analysis?.risk_assessment && (
+              {stockData?.analysis?.risk_assessment ? (
                 <div className="space-y-6">
                   <Card>
                     <CardHeader>
@@ -403,11 +563,19 @@ export function StockAnalysisDashboard({
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer
-                        content={
-                          stockData.analysis.risk_assessment.risky_analysis
-                        }
-                      />
+                      {stockData.analysis.risk_assessment.risky_analysis ? (
+                        <MarkdownRenderer
+                          content={
+                            stockData.analysis.risk_assessment.risky_analysis
+                          }
+                        />
+                      ) : (
+                        <div className="bg-muted rounded-lg p-4">
+                          <p className="text-muted-foreground text-sm">
+                            High-risk analysis is not available for this report.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -419,11 +587,20 @@ export function StockAnalysisDashboard({
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer
-                        content={
-                          stockData.analysis.risk_assessment.safe_analysis
-                        }
-                      />
+                      {stockData.analysis.risk_assessment.safe_analysis ? (
+                        <MarkdownRenderer
+                          content={
+                            stockData.analysis.risk_assessment.safe_analysis
+                          }
+                        />
+                      ) : (
+                        <div className="bg-muted rounded-lg p-4">
+                          <p className="text-muted-foreground text-sm">
+                            Conservative analysis is not available for this
+                            report.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -435,11 +612,19 @@ export function StockAnalysisDashboard({
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer
-                        content={
-                          stockData.analysis.risk_assessment.neutral_analysis
-                        }
-                      />
+                      {stockData.analysis.risk_assessment.neutral_analysis ? (
+                        <MarkdownRenderer
+                          content={
+                            stockData.analysis.risk_assessment.neutral_analysis
+                          }
+                        />
+                      ) : (
+                        <div className="bg-muted rounded-lg p-4">
+                          <p className="text-muted-foreground text-sm">
+                            Balanced analysis is not available for this report.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -451,14 +636,41 @@ export function StockAnalysisDashboard({
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MarkdownRenderer
-                        content={
-                          stockData.analysis.risk_assessment.judge_decision
-                        }
-                      />
+                      {stockData.analysis.risk_assessment.judge_decision ? (
+                        <MarkdownRenderer
+                          content={
+                            stockData.analysis.risk_assessment.judge_decision
+                          }
+                        />
+                      ) : (
+                        <div className="bg-muted rounded-lg p-4">
+                          <p className="text-muted-foreground text-sm">
+                            Risk assessment decision is not available for this
+                            report.
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Risk Assessment</CardTitle>
+                    <CardDescription>
+                      Risk assessment data is not available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-muted-foreground text-sm">
+                        Risk assessment analysis is not available for this
+                        report. This may be because the analysis is still in
+                        progress or the data could not be retrieved.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
           </TabsContent>
@@ -475,7 +687,7 @@ export function StockAnalysisDashboard({
               </div>
 
               {/* Trading Plan */}
-              {stockData?.analysis?.trader_plan && (
+              {stockData?.analysis?.trader_plan ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>Trading Plan & Strategy</CardTitle>
@@ -489,10 +701,28 @@ export function StockAnalysisDashboard({
                     />
                   </CardContent>
                 </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Trading Plan & Strategy</CardTitle>
+                    <CardDescription>
+                      Trading plan data is not available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-muted-foreground text-sm">
+                        Trading plan analysis is not available for this report.
+                        This may be because the analysis is still in progress or
+                        the data could not be retrieved.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Final Recommendation */}
-              {stockData?.analysis?.final_recommendation && (
+              {stockData?.analysis?.final_recommendation ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>Final Investment Recommendation</CardTitle>
@@ -505,6 +735,24 @@ export function StockAnalysisDashboard({
                     <MarkdownRenderer
                       content={stockData.analysis.final_recommendation}
                     />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Final Investment Recommendation</CardTitle>
+                    <CardDescription>
+                      Final recommendation data is not available
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-muted-foreground text-sm">
+                        Final investment recommendation is not available for
+                        this report. This may be because the analysis is still
+                        in progress or the data could not be retrieved.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               )}

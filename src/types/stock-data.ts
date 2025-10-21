@@ -1,4 +1,5 @@
 export interface StockData {
+  session_id: string;
   ticker: string;
   date: string;
   analysis: {
