@@ -13,6 +13,8 @@ import {
   IconCheck,
   IconX,
   IconAlertTriangle,
+  IconSortAscending2,
+  IconSortDescending2,
 } from "@tabler/icons-react";
 import {
   type ColumnDef,
@@ -87,16 +89,16 @@ const teamConfig = {
 // Status configuration for status badges
 const statusConfig = {
   processing: {
-    label: "In Progress",
+    label: "In Process",
     variant: "secondary" as const,
     icon: IconLoader2,
-    iconClassName: "animate-spin",
+    iconClassName: "animate-spin text-gray-500",
   },
   done: {
-    label: "Complete",
-    variant: "default" as const,
+    label: "Done",
+    variant: "outline" as const,
     icon: IconCheck,
-    iconClassName: "",
+    iconClassName: "text-green-600",
   },
   failed: {
     label: "Failed",
@@ -231,10 +233,23 @@ const createColumns = (
     cell: ({ row }) => {
       const config = statusConfig[row.original.status];
       const IconComponent = config.icon;
+
+      // Custom styling based on status
+      const getStatusClasses = (status: string) => {
+        switch (status) {
+          case "processing":
+            return "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200";
+          case "done":
+            return "bg-green-50 text-green-700 border-green-200 hover:bg-green-100";
+          default:
+            return "";
+        }
+      };
+
       return (
         <Badge
           variant={config.variant}
-          className="flex items-center gap-1 px-2 py-0.5 text-xs whitespace-nowrap"
+          className={`flex items-center gap-1 px-2 py-0.5 text-xs whitespace-nowrap ${getStatusClasses(row.original.status)}`}
         >
           <IconComponent className={`size-3 ${config.iconClassName}`} />
           {config.label}
@@ -303,11 +318,36 @@ const createColumns = (
         return <ProgressButton reportId={id} ticker={ticker} />;
       }
 
-      // Show normal recommendation text
+      // Helper function to get emoji for recommendation
+      const getRecommendationEmoji = (rec: string) => {
+        const upperRec = rec.toUpperCase();
+        if (upperRec === "BUY" || upperRec === "STRONG BUY") return "🚀";
+        if (upperRec === "SELL" || upperRec === "STRONG SELL") return "💩";
+        if (upperRec === "HOLD") return "⏸️";
+        if (upperRec === "BUY OR HOLD" || upperRec.includes("BUY")) return "🙌";
+        if (upperRec === "SELL OR HOLD" || upperRec.includes("SELL"))
+          return "🙌";
+        return "📊"; // Default for other recommendations
+      };
+
+      // Handle case where recommendation exists
+      if (recommendation && recommendation.trim() !== "") {
+        return (
+          <Badge
+            variant="outline"
+            className="border-border bg-background text-foreground hover:bg-muted flex items-center gap-1.5 px-2 py-1 text-xs whitespace-nowrap"
+          >
+            <span className="text-sm">
+              {getRecommendationEmoji(recommendation)}
+            </span>
+            <span>{recommendation}</span>
+          </Badge>
+        );
+      }
+
+      // Fallback for empty recommendation
       return (
-        <div className="max-w-48 truncate text-sm" title={recommendation}>
-          {recommendation ?? "No recommendation"}
-        </div>
+        <div className="text-muted-foreground text-xs">No recommendation</div>
       );
     },
     enableSorting: false,
@@ -372,6 +412,9 @@ export function ReportDataTable({
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">(
+    "desc",
+  );
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -524,6 +567,19 @@ export function ReportDataTable({
     setRefreshing(true);
     await fetchData();
   }, [fetchData]);
+
+  // Handle sort direction toggle
+  const handleSortToggle = React.useCallback(() => {
+    const newDirection = sortDirection === "desc" ? "asc" : "desc";
+    setSortDirection(newDirection);
+
+    // Update the sorting state to reflect the new direction
+    setSorting([
+      { id: "updatedAt", desc: newDirection === "desc" },
+      { id: "status", desc: false }, // Keep status sorting as is
+      { id: "analysisDate", desc: newDirection === "desc" },
+    ]);
+  }, [sortDirection]);
 
   // Handle row click navigation
   const handleRowClick = React.useCallback(
@@ -730,8 +786,8 @@ export function ReportDataTable({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="processing">In Progress</SelectItem>
-              <SelectItem value="done">Complete</SelectItem>
+              <SelectItem value="processing">In Process</SelectItem>
+              <SelectItem value="done">Done</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
               <SelectItem value="NEC">Not Enough Coverage</SelectItem>
             </SelectContent>
@@ -761,6 +817,19 @@ export function ReportDataTable({
               <SelectItem value="SELL or HOLD">SELL or HOLD</SelectItem>
             </SelectContent>
           </Select>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSortToggle}
+            title={`Sort ${sortDirection === "desc" ? "Ascending" : "Descending"}`}
+          >
+            {sortDirection === "desc" ? (
+              <IconSortDescending2 className="size-4" />
+            ) : (
+              <IconSortAscending2 className="size-4" />
+            )}
+          </Button>
 
           <Button
             variant="outline"

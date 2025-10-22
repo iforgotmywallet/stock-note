@@ -20,12 +20,12 @@ export interface TeamConfig {
  */
 export const statusConfig: Record<string, StatusConfig> = {
   processing: {
-    label: 'In Progress',
+    label: 'In Process',
     variant: 'secondary',
     color: 'blue',
   },
   done: {
-    label: 'Complete',
+    label: 'Done',
     variant: 'default',
     color: 'green',
   },
@@ -76,7 +76,7 @@ export function getStatusConfig(status: string): StatusConfig {
   }
   // Default fallback to processing status
   return {
-    label: 'In Progress',
+    label: 'In Process',
     variant: 'secondary',
     color: 'blue',
   };
