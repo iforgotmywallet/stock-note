@@ -246,23 +246,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
     return hash ? hash.substring(0, 7) : sessionId.substring(0, 7);
   }, []);
 
-  // Generate consistent border color for hash badge based on hash value
-  const getHashColor = useCallback((hash: string) => {
-    // Use hash to generate consistent colors
-    let hashValue = 0;
-    for (let i = 0; i < hash.length; i++) {
-      hashValue = hash.charCodeAt(i) + ((hashValue << 5) - hashValue);
-    }
-    
-    // Generate HSL color with good contrast for border
-    const hue = Math.abs(hashValue) % 360;
-    const saturation = 60 + (Math.abs(hashValue) % 25); // 60-85% for more vibrant borders
-    const lightness = 50 + (Math.abs(hashValue) % 20); // 50-70% for good visibility
-    
-    return {
-      borderColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-    };
-  }, []);
+
 
   // Load more reports
   const loadMoreReports = useCallback(async () => {
@@ -469,8 +453,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
                   </span>
                   <Badge
                     variant="outline"
-                    className="ml-auto h-auto shrink-0 px-1.5 py-0.5 text-xs font-light opacity-80 transition-all hover:opacity-100 hover:scale-105 border-2"
-                    style={getHashColor(extractHash(item.sessionId))}
+                    className="ml-auto h-auto shrink-0 px-1.5 py-0.5 text-xs font-light opacity-80 transition-all hover:opacity-100 hover:scale-105"
                   >
                     {extractHash(item.sessionId)}
                   </Badge>

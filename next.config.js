@@ -6,10 +6,7 @@ import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
 const config = {
-  typescript: {
-    // Temporarily ignore build errors due to Next.js 15 + better-auth-ui compatibility issue
-    ignoreBuildErrors: true,
-  },
+  // Build configuration
 };
 
 export default config;

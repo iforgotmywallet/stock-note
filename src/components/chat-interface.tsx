@@ -336,7 +336,7 @@ function ChatProvider({
           toast.error(chatError.message, {
             action: {
               label: "Retry",
-              onClick: retryLastMessage,
+              onClick: () => void retryLastMessage(),
             },
           });
         } else {

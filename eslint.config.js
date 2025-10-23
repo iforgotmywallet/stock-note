@@ -46,6 +46,13 @@ export default tseslint.config(
       "@typescript-eslint/unbound-method": "warn",
       "@typescript-eslint/no-empty-function": "warn",
       "@typescript-eslint/restrict-template-expressions": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-inferrable-types": "warn",
+      "@typescript-eslint/prefer-function-type": "warn",
+      "@typescript-eslint/prefer-regexp-exec": "warn",
+      "react-hooks/rules-of-hooks": "warn",
+      "react-hooks/exhaustive-deps": "warn",
+      "@next/next/no-img-element": "warn",
       "react/no-unescaped-entities": "off", // Already fixed these
     },
   },

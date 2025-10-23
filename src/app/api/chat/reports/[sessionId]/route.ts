@@ -4,7 +4,7 @@ import { auth } from "~/lib/auth";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     // Get the session from the request
@@ -16,7 +16,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { sessionId } = params;
+    const { sessionId } = await params;
 
     if (!sessionId) {
       return NextResponse.json(

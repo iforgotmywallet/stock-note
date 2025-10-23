@@ -4,9 +4,23 @@ import React, { useState, createContext, useContext, useCallback } from "react";
 import { ReportSelector } from "~/components/report-selector";
 import { ChatInterface } from "~/components/chat-interface";
 import { Button } from "~/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "~/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "~/components/ui/sheet";
 import { Badge } from "~/components/ui/badge";
-import { Menu, BotMessageSquare, FileText, X, AlertTriangle } from "lucide-react";
+import {
+  Menu,
+  BotMessageSquare,
+  FileText,
+  X,
+  AlertTriangle,
+  RotateCcw,
+} from "lucide-react";
 import { ErrorBoundary } from "~/components/error-boundary";
 import { cn } from "~/lib/utils";
 
@@ -129,7 +143,9 @@ function MobileReportSelector() {
       <SheetContent side="left" className="w-80 p-0">
         <SheetHeader className="sr-only">
           <SheetTitle>Report Selector</SheetTitle>
-          <SheetDescription>Select reports to include in your chat conversation.</SheetDescription>
+          <SheetDescription>
+            Select reports to include in your chat conversation.
+          </SheetDescription>
         </SheetHeader>
         <div className="h-full overflow-hidden">
           <ReportSelector
@@ -196,22 +212,15 @@ function ChatHeader() {
           <MobileReportSelector />
 
           {selectedReports.length > 0 && (
-            <div className="hidden items-center gap-2 md:flex">
-              <div className="text-muted-foreground flex items-center gap-1 text-sm">
-                <FileText className="size-4" />
-                <span>
-                  {selectedReports.length} report
-                  {selectedReports.length !== 1 ? "s" : ""} selected
-                </span>
-              </div>
+            <div className="hidden items-center gap-3 md:flex">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={clearAllReports}
                 className="text-muted-foreground hover:text-foreground"
               >
-                <X className="mr-1 size-4" />
-                Clear All
+                <RotateCcw className="mr-1 size-4" />
+                Reset
               </Button>
             </div>
           )}
@@ -221,22 +230,15 @@ function ChatHeader() {
       {/* Mobile selected reports indicator */}
       {selectedReports.length > 0 && (
         <div className="mt-3 md:hidden">
-          <div className="flex items-center justify-between">
-            <div className="text-muted-foreground flex items-center gap-1 text-sm">
-              <FileText className="size-4" />
-              <span>
-                {selectedReports.length} report
-                {selectedReports.length !== 1 ? "s" : ""} selected
-              </span>
-            </div>
+          <div className="flex items-center justify-end">
             <Button
               variant="ghost"
               size="sm"
               onClick={clearAllReports}
               className="text-muted-foreground hover:text-foreground"
             >
-              <X className="mr-1 size-4" />
-              Clear All
+              <RotateCcw className="mr-1 size-4" />
+              Reset
             </Button>
           </div>
 
