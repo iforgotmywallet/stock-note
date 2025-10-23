@@ -16,6 +16,8 @@ import {
   IconAlertTriangle,
   IconSortAscending2,
   IconSortDescending2,
+  IconChevronDown,
+  IconEyeOff,
 } from "@tabler/icons-react";
 import {
   type ColumnDef,
@@ -52,6 +54,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 import { Label } from "~/components/ui/label";
 import {
   Select,
@@ -75,6 +82,7 @@ import {
   deleteReport,
   type AgentReportRow,
 } from "~/actions/agent-reports";
+import { extractHashFromSessionId } from "~/lib/utils";
 
 // Re-export the type for external use
 export type { AgentReportRow } from "~/actions/agent-reports";
@@ -136,39 +144,60 @@ interface ReportDataTableProps {
   userId: string;
   className?: string;
   onRefreshReady?: (refreshFn: () => Promise<void>) => void;
+  showIdColumn?: boolean;
 }
 
 // Create columns with action handlers
 const createColumns = (
   onTogglePublish: (id: string, ticker: string, published: boolean) => void,
   onDelete: (id: string, ticker: string) => void,
-): ColumnDef<AgentReportRow>[] => [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
+  showIdColumn: boolean = false,
+): ColumnDef<AgentReportRow>[] => {
+  const columns: ColumnDef<AgentReportRow>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+  ];
+
+  // Conditionally add ID column
+  if (showIdColumn) {
+    columns.push({
+      accessorKey: "sessionId",
+      header: "Id",
+      cell: ({ row }) => {
+        const sessionId = row.original.sessionId;
+        const hashId = extractHashFromSessionId(sessionId);
+        return <div className="font-mono text-sm">{hashId}</div>;
+      },
+      enableSorting: true,
+    });
+  }
+
+  // Add remaining columns
+  columns.push(
   {
     accessorKey: "ticker",
     header: "Name",
@@ -282,7 +311,64 @@ const createColumns = (
   },
   {
     accessorKey: "updatedAt",
-    header: "Updated",
+    header: ({ column }) => {
+      const [popoverOpen, setPopoverOpen] = React.useState(false);
+      
+      const handleSort = (direction: "asc" | "desc") => {
+        column.toggleSorting(direction === "desc");
+        setPopoverOpen(false);
+      };
+
+      const handleHide = () => {
+        column.toggleVisibility(false);
+        setPopoverOpen(false);
+      };
+
+      return (
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-auto p-0 font-medium hover:bg-transparent"
+            >
+              <span>Updated</span>
+              <IconChevronDown className="ml-1 h-3 w-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-32 p-1" align="start">
+            <div className="space-y-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs"
+                onClick={() => handleSort("asc")}
+              >
+                <IconSortAscending2 className="mr-2 h-3 w-3" />
+                Asc
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs"
+                onClick={() => handleSort("desc")}
+              >
+                <IconSortDescending2 className="mr-2 h-3 w-3" />
+                Desc
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs"
+                onClick={handleHide}
+              >
+                <IconEyeOff className="mr-2 h-3 w-3" />
+                Hide
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      );
+    },
     cell: ({ row }) => (
       <div className="text-muted-foreground text-sm whitespace-nowrap">
         {row.original.updatedAt.toLocaleDateString("en-US", {
@@ -387,13 +473,16 @@ const createColumns = (
         </DropdownMenuContent>
       </DropdownMenu>
     ),
-  },
-];
+  });
+
+  return columns;
+};
 
 export function ReportDataTable({
   userId,
   className,
   onRefreshReady,
+  showIdColumn = false,
 }: ReportDataTableProps) {
   // Navigation
   const router = useRouter();
@@ -403,9 +492,7 @@ export function ReportDataTable({
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
-  const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">(
-    "desc",
-  );
+
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -629,18 +716,7 @@ export function ReportDataTable({
     }
   }, [confirmDialog, handleDelete, handleTogglePublish]);
 
-  // Handle sort direction toggle
-  const handleSortToggle = React.useCallback(() => {
-    const newDirection = sortDirection === "desc" ? "asc" : "desc";
-    setSortDirection(newDirection);
 
-    // Update the sorting state to reflect the new direction
-    setSorting([
-      { id: "updatedAt", desc: newDirection === "desc" },
-      { id: "status", desc: false }, // Keep status sorting as is
-      { id: "analysisDate", desc: newDirection === "desc" },
-    ]);
-  }, [sortDirection]);
 
   // Handle row click navigation
   const handleRowClick = React.useCallback(
@@ -698,8 +774,9 @@ export function ReportDataTable({
         (id: string, ticker: string, published: boolean) =>
           openConfirmDialog(published ? "unpublish" : "publish", id, ticker),
         (id: string, ticker: string) => openConfirmDialog("delete", id, ticker),
+        showIdColumn,
       ),
-    [openConfirmDialog],
+    [openConfirmDialog, showIdColumn],
   );
 
   const table = useReactTable({
@@ -827,18 +904,7 @@ export function ReportDataTable({
             </SelectContent>
           </Select>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSortToggle}
-            title={`Sort ${sortDirection === "desc" ? "Ascending" : "Descending"}`}
-          >
-            {sortDirection === "desc" ? (
-              <IconSortDescending2 className="size-4" />
-            ) : (
-              <IconSortAscending2 className="size-4" />
-            )}
-          </Button>
+
 
           <Button
             variant="outline"

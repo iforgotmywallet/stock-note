@@ -76,6 +76,12 @@ export function NavMain({
             ];
             const isComingSoon = comingSoonItems.includes(item.title);
 
+            const handleItemClick = () => {
+              if (!isComingSoon && item.url) {
+                router.push(item.url);
+              }
+            };
+
             return (
               <SidebarMenuItem key={item.title}>
                 <div className="relative flex items-center">
@@ -85,6 +91,7 @@ export function NavMain({
                     className={
                       isComingSoon ? "cursor-not-allowed opacity-50" : ""
                     }
+                    onClick={handleItemClick}
                   >
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>

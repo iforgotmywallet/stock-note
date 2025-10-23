@@ -304,6 +304,55 @@ export class AgentReportsService {
   }
 
   /**
+   * Fetch saved reports for sidebar display from savedList table
+   * @param userId - User ID to filter reports
+   * @param limit - Maximum number of reports to return (default: 10)
+   * @returns Promise<SidebarReportItem[]> - Array of saved reports for sidebar
+   */
+  static async getSavedReportsForSidebar(
+    userId: string,
+    limit = 10,
+  ): Promise<SidebarReportItem[]> {
+    try {
+      // Query from savedList table joined with agent_reports table
+      const savedEntries = await db.savedList.findMany({
+        where: {
+          userId,
+          report: {
+            status: "done", // Only show completed reports in sidebar
+            recommendation: {
+              not: null,
+            },
+          },
+        },
+        orderBy: {
+          savedAt: "desc", // Order by most recently saved
+        },
+        take: limit,
+        include: {
+          report: {
+            select: {
+              session_id: true,
+              ticker: true,
+              analysis_date: true,
+              updated_at: true,
+              recommendation: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      return savedEntries
+        .filter((entry) => entry.report) // Filter out any entries without reports
+        .map((entry) => this.transformToSidebarItem(entry.report!));
+    } catch (error) {
+      console.error("Error fetching saved reports for sidebar:", error);
+      throw new Error("Failed to fetch saved reports for sidebar");
+    }
+  }
+
+  /**
    * Check if a report exists and is accessible by the user
    * @param sessionId - Session ID of the report
    * @param userId - User ID to verify ownership

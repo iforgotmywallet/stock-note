@@ -4,19 +4,17 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import {
   IconCamera,
-  IconChartBar,
-  IconDashboard,
   IconFileAi,
   IconFileDescription,
-  IconFolder,
   IconHelp,
-  IconListDetails,
   IconSettings,
   IconStackMiddle,
   IconAlertCircle,
+  IconTable,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "~/components/nav-documents";
+import { NavSaved } from "~/components/nav-saved";
 import { NavMain } from "~/components/nav-main";
 import { NavSecondary } from "~/components/nav-secondary";
 import { NavUser } from "~/components/nav-user";
@@ -71,24 +69,9 @@ const data = {
   },
   navMain: [
     {
-      title: "Dashboard",
-      url: "#",
-      icon: IconDashboard,
-    },
-    {
-      title: "Trending",
-      url: "#",
-      icon: IconListDetails,
-    },
-    {
-      title: "Watch List",
-      url: "#",
-      icon: IconFolder,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconChartBar,
+      title: "Table View",
+      url: "/table",
+      icon: IconTable,
     },
   ],
   navClouds: [
@@ -198,6 +181,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <SidebarErrorBoundary>
           <NavMain items={data.navMain} />
+        </SidebarErrorBoundary>
+        <SidebarErrorBoundary>
+          <NavSaved userId={currentUser?.id || ""} />
         </SidebarErrorBoundary>
         <SidebarErrorBoundary>
           <NavDocuments userId={currentUser?.id || ""} />
