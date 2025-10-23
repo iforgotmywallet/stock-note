@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  IconCirclePlusFilled,
+  IconTerminal2,
   IconCalendarTime,
   type Icon,
 } from "@tabler/icons-react";
@@ -46,7 +46,7 @@ export function NavMain({
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
               onClick={handleStartAnalysis}
             >
-              <IconCirclePlusFilled />
+              <IconTerminal2 />
               <span>Start Analysis</span>
             </SidebarMenuButton>
             <Tooltip>
@@ -66,14 +66,38 @@ export function NavMain({
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title}>
-                {item.icon && <item.icon />}
-                <span>{item.title}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            // Items that should be disabled with "Coming Soon" badge
+            const comingSoonItems = [
+              "Dashboard",
+              "Trending",
+              "Watch List",
+              "Search",
+            ];
+            const isComingSoon = comingSoonItems.includes(item.title);
+
+            return (
+              <SidebarMenuItem key={item.title}>
+                <div className="relative flex items-center">
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    disabled={isComingSoon}
+                    className={
+                      isComingSoon ? "cursor-not-allowed opacity-50" : ""
+                    }
+                  >
+                    {item.icon && <item.icon />}
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                  {isComingSoon && (
+                    <div className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      Soon
+                    </div>
+                  )}
+                </div>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

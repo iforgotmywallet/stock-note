@@ -14,11 +14,12 @@ import {
   TagsTrigger,
   TagsValue,
 } from "./ui/shadcn-io/tags";
-import { LineChart, Loader2, CheckIcon } from "lucide-react";
+import { SquareTerminal, Loader2, CheckIcon } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
 import { queueAnalysisReport } from "~/actions/generation";
+import { ErrorBoundary, AnalysisErrorFallback } from "./error-boundary";
 
 interface FormData {
   ticker: string;
@@ -39,13 +40,11 @@ const analysts: Analyst[] = [
 ];
 
 interface AnalysisSearchCardProps {
-  onOptimisticReportAdd?:
-    | ((ticker: string, sessionId: string) => Promise<string>)
-    | null;
+  onAnalysisComplete?: () => void;
 }
 
-const AnalysisSearchCard = ({
-  onOptimisticReportAdd,
+const AnalysisSearchCardContent = ({
+  onAnalysisComplete,
 }: AnalysisSearchCardProps) => {
   const [formData, setFormData] = useState<FormData>({
     ticker: "",
@@ -94,27 +93,29 @@ const AnalysisSearchCard = ({
     setIsAnalyzing(true);
 
     try {
-      // Generate a session ID for tracking
-      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      // Validate form data before submission
+      if (!formData.ticker.trim()) {
+        toast.error("❌ Please enter a ticker symbol");
+        return;
+      }
 
-      // Queue the analysis using the server action first
+      if (!formData.analyze_date) {
+        toast.error("❌ Please select an analysis date");
+        return;
+      }
+
+      if (formData.analysts.length === 0) {
+        toast.error("❌ Please select at least one analyst");
+        return;
+      }
+
+      // Queue the analysis using the server action
       const result = await queueAnalysisReport({
         ticker: formData.ticker,
         date: formData.analyze_date,
         analysts: formData.analysts,
         published: true,
       });
-
-      // Add optimistic report to UI immediately if analysis was queued successfully
-      let reportId: string | undefined;
-      if (result.success && onOptimisticReportAdd) {
-        try {
-          reportId = await onOptimisticReportAdd(formData.ticker, sessionId);
-        } catch (error) {
-          console.error("Failed to add optimistic report:", error);
-          // Continue even if optimistic update fails
-        }
-      }
 
       if (result.success) {
         console.log("Analysis queued successfully:", result.eventId);
@@ -135,27 +136,75 @@ const AnalysisSearchCard = ({
           analysts: [],
         });
 
-        // Note: The optimistic row will stay in "processing" state until the actual analysis completes
-        // or the user refreshes the page (which will clear optimistic rows and fetch real data)
+        // Notify parent component to refresh the table
+        if (onAnalysisComplete) {
+          onAnalysisComplete();
+        }
       } else {
-        console.error("Failed to queue analysis:", result.message);
-        toast.error("❌ Failed to start analysis. Please try again.");
+        console.error(
+          "Failed to queue analysis:",
+          result.message,
+          result.error,
+        );
 
-        // If analysis failed and we added an optimistic report, we should remove it
-        // For now, we'll let it stay as "processing" and the user can refresh
+        // Provide specific error messages based on the error type
+        if (
+          result.error?.includes("ticker") ||
+          result.error?.includes("Ticker")
+        ) {
+          toast.error(
+            "❌ Invalid ticker symbol. Please use alphanumeric characters only.",
+          );
+        } else if (
+          result.error?.includes("date") ||
+          result.error?.includes("Date")
+        ) {
+          toast.error("❌ Invalid date format. Please select a valid date.");
+        } else if (
+          result.error?.includes("analyst") ||
+          result.error?.includes("Analyst")
+        ) {
+          toast.error("❌ Please select at least one analyst.");
+        } else if (
+          result.error?.includes("Database") ||
+          result.error?.includes("database")
+        ) {
+          toast.error("❌ Database error. Please try again in a moment.");
+        } else if (
+          result.error?.includes("Event queue") ||
+          result.error?.includes("Inngest")
+        ) {
+          toast.error(
+            "❌ Analysis service temporarily unavailable. Please try again later.",
+          );
+        } else {
+          toast.error(
+            `❌ ${result.message || "Failed to start analysis. Please try again."}`,
+          );
+        }
       }
     } catch (error) {
       console.error("Analysis failed:", error);
-      toast.error("❌ Something went wrong. Please try again.");
+
+      // Handle network errors and other unexpected errors
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        toast.error(
+          "❌ Network error. Please check your connection and try again.",
+        );
+      } else if (error instanceof Error) {
+        toast.error(`❌ Error: ${error.message}`);
+      } else {
+        toast.error("❌ Something went wrong. Please try again.");
+      }
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="p-4 md:p-6">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-8">
+        <div className="mb-3">
           <h1 className="mb-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
             Analyze Stock 📈
           </h1>
@@ -165,10 +214,10 @@ const AnalysisSearchCard = ({
         </div>
 
         <form onSubmit={handleStartAnalyze}>
-          <Card className="mb-8">
+          <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                <LineChart className="h-5 w-5" />
+                <SquareTerminal className="h-5 w-5" />
                 Start New Analysis
               </CardTitle>
             </CardHeader>
@@ -256,7 +305,7 @@ const AnalysisSearchCard = ({
                   </>
                 ) : (
                   <>
-                    <LineChart className="mr-2 h-4 w-4" />
+                    <SquareTerminal className="mr-2 h-4 w-4" />
                     Start Analyze
                   </>
                 )}
@@ -266,6 +315,14 @@ const AnalysisSearchCard = ({
         </form>
       </div>
     </div>
+  );
+};
+
+const AnalysisSearchCard = (props: AnalysisSearchCardProps) => {
+  return (
+    <ErrorBoundary fallback={AnalysisErrorFallback}>
+      <AnalysisSearchCardContent {...props} />
+    </ErrorBoundary>
   );
 };
 

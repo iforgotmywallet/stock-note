@@ -30,7 +30,7 @@ model agent_reports {
   recommendation              String?      @db.VarChar(15)
   userId                      String
   published                   Boolean      @default(false)
-  status                      String       @default("processing")
+  status                      String       @default("queued")
   user                        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   recentList                  RecentList[]
   savedList                   SavedList[]

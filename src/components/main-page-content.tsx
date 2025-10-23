@@ -1,7 +1,7 @@
 "use client"
 
-import * as React from "react"
-import { ReportDataTable, type AgentReportRow } from "~/components/report-data-table";
+import { useCallback, useRef } from "react"
+import { ReportDataTable } from "~/components/report-data-table";
 import AnalysisSearchCard from "~/components/analysis-search-card";
 
 interface MainPageContentProps {
@@ -9,43 +9,30 @@ interface MainPageContentProps {
 }
 
 export default function MainPageContent({ userId }: MainPageContentProps) {
-  const addOptimisticReportRef = React.useRef<
-    ((ticker: string, sessionId: string) => Promise<string>) | null
-  >(null)
-  const updateOptimisticReportRef = React.useRef<
-    ((reportId: string, updatedData: Partial<AgentReportRow>) => void) | null
-  >(null)
+  const refreshTableRef = useRef<(() => Promise<void>) | null>(null)
 
-  const handleOptimisticReportAdd = React.useCallback((fn: (ticker: string, sessionId: string) => Promise<string>) => {
-    addOptimisticReportRef.current = fn
+  const handleRefreshReady = useCallback((refreshFn: () => Promise<void>) => {
+    refreshTableRef.current = refreshFn
   }, [])
 
-  const handleOptimisticReportUpdate = React.useCallback((fn: (reportId: string, updatedData: Partial<AgentReportRow>) => void) => {
-    updateOptimisticReportRef.current = fn
-  }, [])
-
-  const addOptimisticReport = React.useCallback(async (ticker: string, sessionId: string) => {
-    if (addOptimisticReportRef.current) {
-      return await addOptimisticReportRef.current(ticker, sessionId)
-    }
-    throw new Error('Add optimistic report function not available')
-  }, [])
-
-  const updateOptimisticReport = React.useCallback((reportId: string, updatedData: Partial<AgentReportRow>) => {
-    if (updateOptimisticReportRef.current) {
-      updateOptimisticReportRef.current(reportId, updatedData)
+  const handleAnalysisComplete = useCallback(async () => {
+    // Add a small delay to ensure database transaction is committed
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Refresh the table when analysis is completed
+    if (refreshTableRef.current) {
+      await refreshTableRef.current()
     }
   }, [])
 
   return (
     <div>
       <AnalysisSearchCard 
-        onOptimisticReportAdd={addOptimisticReport}
+        onAnalysisComplete={handleAnalysisComplete}
       />
       <ReportDataTable 
         userId={userId}
-        onOptimisticReportAdd={handleOptimisticReportAdd}
-        onOptimisticReportUpdate={handleOptimisticReportUpdate}
+        onRefreshReady={handleRefreshReady}
       />
     </div>
   );

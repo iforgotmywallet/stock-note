@@ -10,7 +10,8 @@ import {
   IconDotsVertical,
   IconRefresh,
   IconLoader2,
-  IconCheck,
+  IconWorldUpload,
+  IconCircleCheck,
   IconX,
   IconAlertTriangle,
   IconSortAscending2,
@@ -88,6 +89,12 @@ const teamConfig = {
 
 // Status configuration for status badges
 const statusConfig = {
+  queued: {
+    label: "Queued",
+    variant: "secondary" as const,
+    icon: IconWorldUpload,
+    iconClassName: "text-blue-500",
+  },
   processing: {
     label: "In Process",
     variant: "secondary" as const,
@@ -97,7 +104,7 @@ const statusConfig = {
   done: {
     label: "Done",
     variant: "outline" as const,
-    icon: IconCheck,
+    icon: IconCircleCheck,
     iconClassName: "text-green-600",
   },
   failed: {
@@ -120,7 +127,7 @@ export const agentReportSchema = z.object({
   ticker: z.string(),
   analysisDate: z.date(),
   recommendation: z.string(),
-  status: z.enum(["processing", "done", "failed", "NEC"]),
+  status: z.enum(["queued", "processing", "done", "failed", "NEC"]),
   published: z.boolean(),
   analystTeams: z.array(z.string()),
 });
@@ -128,39 +135,8 @@ export const agentReportSchema = z.object({
 interface ReportDataTableProps {
   userId: string;
   className?: string;
-  onOptimisticReportAdd?: (
-    addOptimisticReport: (ticker: string, sessionId: string) => Promise<string>,
-  ) => void;
-  onOptimisticReportUpdate?: (
-    updateOptimisticReport: (
-      reportId: string,
-      updatedData: Partial<AgentReportRow>,
-    ) => void,
-  ) => void;
+  onRefreshReady?: (refreshFn: () => Promise<void>) => void;
 }
-
-// Animated table row component
-const AnimatedTableRow = React.forwardRef<
-  HTMLTableRowElement,
-  React.HTMLAttributes<HTMLTableRowElement> & {
-    isAnimating?: boolean;
-    isOptimistic?: boolean;
-  }
->(({ className, isAnimating, isOptimistic, ...props }, ref) => {
-  return (
-    <TableRow
-      ref={ref}
-      className={` ${className ?? ""} ${isAnimating ? "animate-slide-down opacity-0" : ""} ${isOptimistic ? "bg-muted/30" : ""} `}
-      style={{
-        animation: isAnimating
-          ? "slideDown 300ms ease-out forwards"
-          : undefined,
-      }}
-      {...props}
-    />
-  );
-});
-AnimatedTableRow.displayName = "AnimatedTableRow";
 
 // Create columns with action handlers
 const createColumns = (
@@ -205,51 +181,66 @@ const createColumns = (
   {
     accessorKey: "analystTeams",
     header: "Team",
-    cell: ({ row }) => (
-      <div className="flex flex-wrap gap-1">
-        {row.original.analystTeams.length > 0 ? (
-          row.original.analystTeams.map((team) => {
-            const config = teamConfig[team as keyof typeof teamConfig];
-            return (
-              <Badge
-                key={team}
-                variant={config?.variant ?? "outline"}
-                className="px-2 py-0.5 text-xs"
-              >
-                {config?.label ?? team}
-              </Badge>
-            );
-          })
-        ) : (
-          <span className="text-muted-foreground text-xs">No teams</span>
-        )}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const isProcessing =
+        row.original.status === "processing" ||
+        row.original.status === "queued";
+      const hasTeams = row.original.analystTeams.length > 0;
+      const teamCount = row.original.analystTeams.length;
+      const showLoading = isProcessing && teamCount < 4; // Only show loading if not all 4 teams are complete
+
+      return (
+        <div className="flex flex-wrap items-center gap-1">
+          {hasTeams ? (
+            row.original.analystTeams.map((team) => {
+              const config = teamConfig[team as keyof typeof teamConfig];
+              return (
+                <Badge
+                  key={team}
+                  variant={config?.variant ?? "outline"}
+                  className="px-2 py-0.5 text-xs"
+                >
+                  {config?.label ?? team}
+                </Badge>
+              );
+            })
+          ) : (
+            <span className="text-muted-foreground text-xs">
+              Analyst joining
+            </span>
+          )}
+
+          {/* Show loading icon when queued/processing and teams are still being processed */}
+          {showLoading && (
+            <IconLoader2 className="ml-1 size-3 animate-spin text-blue-500" />
+          )}
+        </div>
+      );
+    },
     enableSorting: false,
   },
   {
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
-      const config = statusConfig[row.original.status];
-      const IconComponent = config.icon;
+      const config =
+        statusConfig[row.original.status as keyof typeof statusConfig];
 
-      // Custom styling based on status
-      const getStatusClasses = (status: string) => {
-        switch (status) {
-          case "processing":
-            return "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200";
-          case "done":
-            return "bg-green-50 text-green-700 border-green-200 hover:bg-green-100";
-          default:
-            return "";
-        }
-      };
+      // Fallback for unknown status
+      if (!config) {
+        return (
+          <Badge variant="outline" className="px-2 py-0.5 text-xs">
+            {row.original.status}
+          </Badge>
+        );
+      }
+
+      const IconComponent = config.icon;
 
       return (
         <Badge
           variant={config.variant}
-          className={`flex items-center gap-1 px-2 py-0.5 text-xs whitespace-nowrap ${getStatusClasses(row.original.status)}`}
+          className={`flex items-center gap-1 px-2 py-0.5 text-xs whitespace-nowrap`}
         >
           <IconComponent className={`size-3 ${config.iconClassName}`} />
           {config.label}
@@ -258,12 +249,13 @@ const createColumns = (
     },
     enableSorting: true,
     sortingFn: (rowA, rowB) => {
-      // Define status priority: processing > failed > NEC > done
+      // Define status priority: queued > processing > failed > NEC > done
       const statusPriority = {
-        processing: 0,
-        failed: 1,
-        NEC: 2,
-        done: 3,
+        queued: 0,
+        processing: 1,
+        failed: 2,
+        NEC: 3,
+        done: 4,
       };
       const priorityA =
         statusPriority[rowA.original.status as keyof typeof statusPriority] ??
@@ -401,8 +393,7 @@ const createColumns = (
 export function ReportDataTable({
   userId,
   className,
-  onOptimisticReportAdd,
-  onOptimisticReportUpdate,
+  onRefreshReady,
 }: ReportDataTableProps) {
   // Navigation
   const router = useRouter();
@@ -431,14 +422,6 @@ export function ReportDataTable({
     pageSize: 10,
   });
 
-  // Animation state for new rows
-  const [animatingRows, setAnimatingRows] = React.useState<Set<string>>(
-    new Set(),
-  );
-  const [optimisticRows, setOptimisticRows] = React.useState<Set<string>>(
-    new Set(),
-  );
-
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = React.useState<{
     open: boolean;
@@ -457,26 +440,67 @@ export function ReportDataTable({
     try {
       setError(null);
       const reports = await getAgentReports(userId);
+      console.log(
+        "Fetched reports:",
+        reports.map((r) => ({
+          ticker: r.ticker,
+          status: r.status,
+          sessionId: r.sessionId,
+        })),
+      );
       setData(reports);
-
-      // Clear optimistic rows when fetching fresh data (e.g., on refresh)
-      setOptimisticRows(new Set());
-      setAnimatingRows(new Set());
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch reports";
+      console.error("Error fetching reports:", err);
+
+      let errorMessage = "Failed to fetch reports";
+      let toastMessage = "Failed to load analysis reports";
+
+      if (err instanceof Error) {
+        errorMessage = err.message;
+
+        // Provide specific error messages based on error type
+        if (err.message.includes("network") || err.message.includes("fetch")) {
+          toastMessage = "Network error - please check your connection";
+        } else if (err.message.includes("timeout")) {
+          toastMessage = "Request timed out - please try again";
+        } else if (
+          err.message.includes("database") ||
+          err.message.includes("Database")
+        ) {
+          toastMessage = "Database temporarily unavailable";
+        } else if (
+          err.message.includes("unauthorized") ||
+          err.message.includes("Unauthorized")
+        ) {
+          toastMessage = "Session expired - please sign in again";
+        }
+      }
+
       setError(errorMessage);
-      toast.error("Failed to load analysis reports");
+      toast.error(toastMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [userId]);
 
+  // Handle refresh
+  const handleRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchData();
+  }, [fetchData]);
+
   // Initial data fetch
   React.useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  // Expose refresh function to parent component
+  React.useEffect(() => {
+    if (onRefreshReady) {
+      onRefreshReady(handleRefresh);
+    }
+  }, [onRefreshReady, handleRefresh]);
 
   // Handle confirmation dialog actions
   const openConfirmDialog = React.useCallback(
@@ -508,7 +532,7 @@ export function ReportDataTable({
         toast.success(
           `Report ${newPublished ? "published" : "unpublished"} successfully`,
         );
-        // Optimistically update the local state
+        // Update the local state
         setData((prevData) =>
           prevData.map((report) =>
             report.id === reportId
@@ -517,13 +541,30 @@ export function ReportDataTable({
           ),
         );
       } catch (err) {
-        toast.error(
-          `Failed to ${newPublished ? "publish" : "unpublish"} report`,
-        );
         console.error(
           `Error ${newPublished ? "publishing" : "unpublishing"} report:`,
           err,
         );
+
+        // Provide specific error messages
+        let errorMessage = `Failed to ${newPublished ? "publish" : "unpublish"} report`;
+        if (err instanceof Error) {
+          if (
+            err.message.includes("network") ||
+            err.message.includes("fetch")
+          ) {
+            errorMessage = "Network error - please check your connection";
+          } else if (
+            err.message.includes("unauthorized") ||
+            err.message.includes("permission")
+          ) {
+            errorMessage = "You don't have permission to modify this report";
+          } else if (err.message.includes("not found")) {
+            errorMessage = "Report not found - it may have been deleted";
+          }
+        }
+
+        toast.error(errorMessage);
       } finally {
         closeConfirmDialog();
       }
@@ -536,13 +577,39 @@ export function ReportDataTable({
       try {
         await deleteReport(reportId);
         toast.success("Report deleted successfully");
-        // Optimistically remove from local state
+        // Remove from local state
         setData((prevData) =>
           prevData.filter((report) => report.id !== reportId),
         );
       } catch (err) {
-        toast.error("Failed to delete report");
         console.error("Error deleting report:", err);
+
+        // Provide specific error messages
+        let errorMessage = "Failed to delete report";
+        if (err instanceof Error) {
+          if (
+            err.message.includes("network") ||
+            err.message.includes("fetch")
+          ) {
+            errorMessage = "Network error - please check your connection";
+          } else if (
+            err.message.includes("unauthorized") ||
+            err.message.includes("permission")
+          ) {
+            errorMessage = "You don't have permission to delete this report";
+          } else if (err.message.includes("not found")) {
+            errorMessage =
+              "Report not found - it may have already been deleted";
+          } else if (
+            err.message.includes("constraint") ||
+            err.message.includes("reference")
+          ) {
+            errorMessage =
+              "Cannot delete report - it may be referenced by other data";
+          }
+        }
+
+        toast.error(errorMessage);
       } finally {
         closeConfirmDialog();
       }
@@ -562,12 +629,6 @@ export function ReportDataTable({
     }
   }, [confirmDialog, handleDelete, handleTogglePublish]);
 
-  // Handle refresh
-  const handleRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-  }, [fetchData]);
-
   // Handle sort direction toggle
   const handleSortToggle = React.useCallback(() => {
     const newDirection = sortDirection === "desc" ? "asc" : "desc";
@@ -583,7 +644,7 @@ export function ReportDataTable({
 
   // Handle row click navigation
   const handleRowClick = React.useCallback(
-    (sessionId: string, event: React.MouseEvent) => {
+    async (sessionId: string, event: React.MouseEvent) => {
       // Prevent navigation if clicking on buttons or interactive elements
       const target = event.target as HTMLElement;
       if (
@@ -593,95 +654,42 @@ export function ReportDataTable({
       ) {
         return;
       }
+
+      // Update sidebar ordering before navigation
+      try {
+        console.log("Updating sidebar for sessionId:", sessionId);
+        const response = await fetch("/api/reports/sidebar", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ sessionId }),
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `API call failed: ${response.status} ${response.statusText}`,
+          );
+        }
+
+        const result = await response.json();
+        console.log("Sidebar update result:", result);
+
+        // Dispatch a custom event to notify the sidebar to refresh
+        window.dispatchEvent(
+          new CustomEvent("sidebarRefresh", {
+            detail: { sessionId },
+          }),
+        );
+      } catch (error) {
+        console.error("Failed to update sidebar ordering:", error);
+        // Continue with navigation even if sidebar update fails
+      }
+
       router.push(`/document/${sessionId}`);
     },
     [router],
   );
-
-  // Add optimistic report for new analysis
-  const addOptimisticReport = React.useCallback(
-    async (ticker: string, sessionId: string) => {
-      try {
-        // Generate a temporary ID for the optimistic row (client-side only)
-        const reportId = `optimistic_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-        // Create optimistic row data (UI-only, not persisted to database)
-        const optimisticRow: AgentReportRow = {
-          id: reportId,
-          ticker,
-          analysisDate: new Date(),
-          updatedAt: new Date(),
-          recommendation: "",
-          status: "processing",
-          published: false,
-          analystTeams: [],
-          sessionId,
-          userId,
-        };
-
-        // Add to optimistic rows set
-        setOptimisticRows((prev) => new Set(prev).add(reportId));
-
-        // Add to animating rows set for animation
-        setAnimatingRows((prev) => new Set(prev).add(reportId));
-
-        // Add to data at the beginning of the array
-        setData((prevData) => [optimisticRow, ...prevData]);
-
-        // Remove from animating rows after animation completes
-        setTimeout(() => {
-          setAnimatingRows((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(reportId);
-            return newSet;
-          });
-        }, 300); // Animation duration
-
-        return reportId;
-      } catch (error) {
-        console.error("Error adding optimistic report:", error);
-        toast.error("Failed to start analysis");
-        throw error;
-      }
-    },
-    [userId],
-  );
-
-  // Update optimistic report when analysis completes
-  const updateOptimisticReport = React.useCallback(
-    (reportId: string, updatedData: Partial<AgentReportRow>) => {
-      setData((prevData) =>
-        prevData.map((report) =>
-          report.id === reportId ? { ...report, ...updatedData } : report,
-        ),
-      );
-
-      // Remove from optimistic rows set if analysis is complete
-      if (updatedData.status && updatedData.status !== "processing") {
-        setOptimisticRows((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(reportId);
-          return newSet;
-        });
-      }
-    },
-    [],
-  );
-
-  // Expose optimistic update functions to parent component
-  React.useEffect(() => {
-    if (onOptimisticReportAdd) {
-      onOptimisticReportAdd(addOptimisticReport);
-    }
-    if (onOptimisticReportUpdate) {
-      onOptimisticReportUpdate(updateOptimisticReport);
-    }
-  }, [
-    addOptimisticReport,
-    updateOptimisticReport,
-    onOptimisticReportAdd,
-    onOptimisticReportUpdate,
-  ]);
 
   // Create columns with handlers
   const columns = React.useMemo(
@@ -786,6 +794,7 @@ export function ReportDataTable({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="queued">Queued</SelectItem>
               <SelectItem value="processing">In Process</SelectItem>
               <SelectItem value="done">Done</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
@@ -868,32 +877,25 @@ export function ReportDataTable({
             </TableHeader>
             <TableBody>
               {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => {
-                  const isAnimating = animatingRows.has(row.id);
-                  const isOptimistic = optimisticRows.has(row.id);
-
-                  return (
-                    <AnimatedTableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                      isAnimating={isAnimating}
-                      isOptimistic={isOptimistic}
-                      onClick={(event) =>
-                        handleRowClick(row.original.sessionId, event)
-                      }
-                      className="hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </AnimatedTableRow>
-                  );
-                })
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    onClick={(event) => {
+                      void handleRowClick(row.original.sessionId, event);
+                    }}
+                    className="hover:bg-muted/50 cursor-pointer transition-colors"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
               ) : (
                 <TableRow>
                   <TableCell

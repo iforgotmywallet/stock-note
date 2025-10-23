@@ -9,7 +9,7 @@ export interface AgentReportRow {
   analysisDate: Date;
   updatedAt: Date;
   recommendation: string;
-  status: 'processing' | 'done' | 'failed' | 'NEC';
+  status: 'queued' | 'processing' | 'done' | 'failed' | 'NEC';
   published: boolean;
   analystTeams: string[];
   sessionId: string;
@@ -106,32 +106,7 @@ export async function deleteReport(id: string): Promise<void> {
   }
 }
 
-/**
- * Create an optimistic report entry for immediate UI feedback
- */
-export async function addOptimisticReport(
-  ticker: string, 
-  userId: string, 
-  sessionId: string
-): Promise<string> {
-  try {
-    const report = await db.agent_reports.create({
-      data: {
-        session_id: sessionId,
-        ticker,
-        analysis_date: new Date(),
-        userId,
-        status: 'processing',
-        published: false,
-      },
-    });
 
-    return report.id;
-  } catch (error) {
-    console.error('Error creating optimistic report:', error);
-    throw new Error('Failed to create optimistic report');
-  }
-}
 
 /**
  * Verify user ownership of a report before allowing modifications

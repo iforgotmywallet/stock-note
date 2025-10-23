@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import {
   IconCreditCard,
   IconDotsVertical,
@@ -7,6 +8,7 @@ import {
   IconNotification,
   IconUserCircle,
 } from "@tabler/icons-react"
+import { authClient } from "~/lib/auth-client"
 
 import {
   Avatar,
@@ -39,6 +41,21 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            router.push("/auth/sign-in")
+          },
+        },
+      })
+    } catch (error) {
+      console.error("Logout failed:", error)
+    }
+  }
 
   return (
     <SidebarMenu>
@@ -98,7 +115,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <IconLogout />
               Log out
             </DropdownMenuItem>

@@ -7,11 +7,20 @@ export interface AgentReportRow {
   ticker: string;
   analysisDate: Date;
   recommendation: string;
-  status: "processing" | "done" | "failed" | "NEC";
+  status: "queued" | "processing" | "done" | "failed" | "NEC";
   published: boolean;
   analystTeams: string[];
   sessionId: string;
   userId: string;
+}
+
+export interface CreateQueuedReportParams {
+  sessionId: string;
+  ticker: string;
+  analysisDate: Date;
+  userId: string;
+  published: boolean;
+  analystTeams: string[];
 }
 
 export interface SidebarReportItem {
@@ -95,36 +104,7 @@ export class AgentReportsService {
     }
   }
 
-  /**
-   * Create an optimistic report entry for immediate UI feedback
-   * @param ticker - Stock ticker symbol
-   * @param userId - User ID
-   * @param sessionId - Session ID for the analysis
-   * @returns Promise<string> - Created report ID
-   */
-  static async addOptimisticReport(
-    ticker: string,
-    userId: string,
-    sessionId: string,
-  ): Promise<string> {
-    try {
-      const report = await db.agent_reports.create({
-        data: {
-          session_id: sessionId,
-          ticker,
-          analysis_date: new Date(),
-          userId,
-          status: "processing",
-          published: false,
-        },
-      });
 
-      return report.id;
-    } catch (error) {
-      console.error("Error creating optimistic report:", error);
-      throw new Error("Failed to create optimistic report");
-    }
-  }
 
   /**
    * Transform database record to table row format
@@ -159,6 +139,96 @@ export class AgentReportsService {
     if (report.social_analyst_report) teams.push("social");
 
     return teams;
+  }
+
+  /**
+   * Create a new report with "queued" status immediately
+   * @param params - Parameters for creating the queued report
+   * @returns Promise<AgentReportRow> - Created report data
+   */
+  static async createQueuedReport(
+    params: CreateQueuedReportParams,
+  ): Promise<AgentReportRow> {
+    try {
+      // Validate input parameters
+      if (!params.sessionId || typeof params.sessionId !== "string") {
+        throw new Error("Session ID is required and must be a string");
+      }
+
+      if (!params.ticker || typeof params.ticker !== "string") {
+        throw new Error("Ticker is required and must be a string");
+      }
+
+      if (!params.userId || typeof params.userId !== "string") {
+        throw new Error("User ID is required and must be a string");
+      }
+
+      if (!(params.analysisDate instanceof Date) || isNaN(params.analysisDate.getTime())) {
+        throw new Error("Analysis date must be a valid Date object");
+      }
+
+      if (!Array.isArray(params.analystTeams)) {
+        throw new Error("Analyst teams must be an array");
+      }
+
+      const report = await db.agent_reports.create({
+        data: {
+          session_id: params.sessionId,
+          ticker: params.ticker,
+          analysis_date: params.analysisDate,
+          userId: params.userId,
+          published: params.published,
+          status: "queued",
+        },
+      });
+
+      return this.transformAgentReport(report);
+    } catch (error) {
+      console.error("Error creating queued report:", error);
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes("unique constraint") || error.message.includes("UNIQUE")) {
+          throw new Error("A report with this session ID already exists");
+        }
+        if (error.message.includes("foreign key") || error.message.includes("FOREIGN")) {
+          throw new Error("Invalid user ID provided");
+        }
+        if (error.message.includes("validation") || error.message.includes("required")) {
+          throw new Error(`Validation error: ${error.message}`);
+        }
+        // Re-throw validation errors as-is
+        if (error.message.includes("is required") || error.message.includes("must be")) {
+          throw error;
+        }
+      }
+      
+      throw new Error("Failed to create queued report - database error");
+    }
+  }
+
+  /**
+   * Update report status using session ID
+   * @param sessionId - Session ID of the report to update
+   * @param status - New status to set
+   * @returns Promise<void>
+   */
+  static async updateReportStatus(
+    sessionId: string,
+    status: AgentReportRow["status"],
+  ): Promise<void> {
+    try {
+      await db.agent_reports.update({
+        where: { session_id: sessionId },
+        data: {
+          status,
+          updated_at: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error("Error updating report status:", error);
+      throw new Error("Failed to update report status");
+    }
   }
 
   /**

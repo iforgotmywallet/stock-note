@@ -252,7 +252,7 @@ export function StockAnalysisDashboard({
                   <CardHeader>
                     <CardTitle>Technical Analysis Report</CardTitle>
                     <CardDescription>
-                      Comprehensive analysis of {stockData.ticker}'s current
+                      Comprehensive analysis of {stockData.ticker}&apos;s current
                       technical position
                     </CardDescription>
                   </CardHeader>

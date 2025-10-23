@@ -173,7 +173,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
     // Add animation class
     setAnimatingItems((prev) => new Set(prev).add(clickedItem.sessionId));
 
-    // Optimistically move clicked item to top
+    // Move clicked item to top
     setReports((prevReports) => {
       const otherReports = prevReports.filter(
         (report) => report.sessionId !== clickedItem.sessionId,
@@ -192,7 +192,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
       });
     } catch (error) {
       console.error("Failed to update report access:", error);
-      // Revert optimistic update on error
+      // Revert update on error
       setReports((prevReports) => {
         const withoutClicked = prevReports.filter(
           (report) => report.sessionId !== clickedItem.sessionId,
@@ -244,6 +244,24 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
     const parts = sessionId.split("_");
     const hash = parts[parts.length - 1];
     return hash ? hash.substring(0, 7) : sessionId.substring(0, 7);
+  }, []);
+
+  // Generate consistent border color for hash badge based on hash value
+  const getHashColor = useCallback((hash: string) => {
+    // Use hash to generate consistent colors
+    let hashValue = 0;
+    for (let i = 0; i < hash.length; i++) {
+      hashValue = hash.charCodeAt(i) + ((hashValue << 5) - hashValue);
+    }
+    
+    // Generate HSL color with good contrast for border
+    const hue = Math.abs(hashValue) % 360;
+    const saturation = 60 + (Math.abs(hashValue) % 25); // 60-85% for more vibrant borders
+    const lightness = 50 + (Math.abs(hashValue) % 20); // 50-70% for good visibility
+    
+    return {
+      borderColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+    };
   }, []);
 
   // Load more reports
@@ -308,6 +326,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
   const refreshDocuments = useCallback(async () => {
     if (isRefreshing || isLoading) return;
 
+    console.log("Refreshing nav-documents...");
     setIsRefreshing(true);
     try {
       // Reset to initial state and refetch
@@ -345,6 +364,24 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
       setIsRefreshing(false);
     }
   }, [isRefreshing, isLoading, maxItems]);
+
+  // Listen for sidebar refresh events from other components
+  useEffect(() => {
+    const handleSidebarRefresh = (event: CustomEvent) => {
+      console.log("Received sidebar refresh event:", event.detail);
+      if (!isRefreshing && !isLoading) {
+        setTimeout(() => {
+          refreshDocuments();
+        }, 200); // Slightly longer delay to ensure API call completes
+      }
+    };
+
+    window.addEventListener('sidebarRefresh', handleSidebarRefresh as EventListener);
+    
+    return () => {
+      window.removeEventListener('sidebarRefresh', handleSidebarRefresh as EventListener);
+    };
+  }, [isRefreshing, isLoading]); // Don't include refreshDocuments to avoid infinite loop
 
   // Loading skeleton
   const renderLoadingSkeleton = () => (
@@ -432,7 +469,8 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
                   </span>
                   <Badge
                     variant="outline"
-                    className="ml-auto h-auto shrink-0 px-1.5 py-0.5 text-xs font-light opacity-60 transition-opacity hover:opacity-100"
+                    className="ml-auto h-auto shrink-0 px-1.5 py-0.5 text-xs font-light opacity-80 transition-all hover:opacity-100 hover:scale-105 border-2"
+                    style={getHashColor(extractHash(item.sessionId))}
                   >
                     {extractHash(item.sessionId)}
                   </Badge>

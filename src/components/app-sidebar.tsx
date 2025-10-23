@@ -6,18 +6,12 @@ import {
   IconCamera,
   IconChartBar,
   IconDashboard,
-  IconDatabase,
   IconFileAi,
   IconFileDescription,
-  IconFileWord,
   IconFolder,
   IconHelp,
-  IconInnerShadowTop,
   IconListDetails,
-  IconReport,
-  IconSearch,
   IconSettings,
-  IconUsers,
   IconStackMiddle,
   IconAlertCircle,
 } from "@tabler/icons-react";
@@ -161,12 +155,10 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string } | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        setIsLoadingUser(true);
         const session = await authClient.getSession();
         if (session?.data?.user) {
           setCurrentUser({
@@ -180,8 +172,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       } catch (error) {
         console.error('Error getting current user:', error);
         setCurrentUser(null);
-      } finally {
-        setIsLoadingUser(false);
       }
     };
 

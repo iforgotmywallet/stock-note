@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import MainPageContent from "~/components/main-page-content";
 
 // Force dynamic rendering since we need user session
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
   //Redirect to auth in not signed in
