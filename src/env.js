@@ -16,6 +16,7 @@ export const env = createEnv({
     STOCK_ANALYZE_URL: z.string().url(),
     BETTER_AUTH_SECRET: z.string(),
     BETTER_AUTH_URL: z.string().url(),
+    OPENAI_API_KEY: z.string(),
   },
 
   /**
@@ -39,6 +40,7 @@ export const env = createEnv({
     STOCK_ANALYZE_URL: process.env.STOCK_ANALYZE_URL,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     NEXT_PUBLIC_LLM_PROVIDER: process.env.NEXT_PUBLIC_LLM_PROVIDER,
   },
   /**

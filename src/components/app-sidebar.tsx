@@ -11,6 +11,7 @@ import {
   IconStackMiddle,
   IconAlertCircle,
   IconTable,
+  IconMessageChatbot,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "~/components/nav-documents";
@@ -72,6 +73,11 @@ const data = {
       title: "Table View",
       url: "/table",
       icon: IconTable,
+    },
+    {
+      title: "Chat",
+      url: "/chat",
+      icon: IconMessageChatbot,
     },
   ],
   navClouds: [
