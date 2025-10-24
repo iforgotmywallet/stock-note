@@ -83,8 +83,7 @@ import {
   type ChatError,
 } from "~/components/enhanced-chat-error-boundaries";
 
-// Enhanced error handling with better categorization
-// ChatError type is now imported from enhanced-chat-error-boundaries
+// ChatError type is imported from enhanced-chat-error-boundaries
 
 // Types based on design document
 interface ChatMessage {
@@ -227,15 +226,13 @@ function EnhancedChatProvider({ children }: { children: React.ReactNode }) {
           errorType = "network";
         }
 
-        const reportError: ChatError = {
-          type: errorType,
-          message: errorMessage,
-          retryable: errorType !== "auth",
-        };
-
         // Only set error for critical auth issues, not for general report loading
         if (errorType === "auth") {
-          setError(reportError);
+          setError({
+            type: errorType,
+            message: errorMessage,
+            retryable: false,
+          });
         }
 
         throw new Error(errorMessage);
@@ -273,12 +270,7 @@ function EnhancedChatProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error("Error fetching reports:", err);
 
-      // Create specific error for report fetching
-      const reportError: ChatError = {
-        type: "reports",
-        message: err instanceof Error ? err.message : "Failed to load reports",
-        retryable: true,
-      };
+
 
       // Only show toast for non-auth errors (auth errors are handled above)
       if (!(err instanceof Error && err.message.includes("Authentication"))) {
@@ -387,18 +379,12 @@ function EnhancedChatProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // Enhanced validation with comprehensive checks
-  const validateMessageInput = (
-    message: string,
-  ): { isValid: boolean; error?: string } => {
-    const validation = validateChatMessage(message);
-    return validation;
-  };
+
 
   const sendMessage = useCallback(
     async (message: string, model: GPTModel) => {
-      // Enhanced validation with comprehensive checks
-      const messageValidation = validateMessageInput(message);
+      // Validate message input
+      const messageValidation = validateChatMessage(message);
       if (!messageValidation.isValid) {
         const error: ChatError = {
           type: "validation",
@@ -495,10 +481,6 @@ function EnhancedChatProvider({ children }: { children: React.ReactNode }) {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          const error = parseError(
-            new Error(errorData.error || "Request failed"),
-            response,
-          );
           throw new Error(errorData.error || "Request failed");
         }
 
@@ -665,14 +647,13 @@ function EnhancedChatProvider({ children }: { children: React.ReactNode }) {
               id: `loading-${report.sessionId}`,
             });
 
-            // Create a more specific error for report loading
-            const reportError: ChatError = {
+            // Set error for report loading failure
+            setError({
               type: "reports",
               message: `Failed to load report: ${report.ticker}`,
               details: { reportId: report.sessionId, ticker: report.ticker },
               retryable: true,
-            };
-            setError(reportError);
+            });
           }
         }
       } catch (err) {
@@ -881,6 +862,29 @@ function ReportSelectionActionMenu() {
     return <ReportSelectionLoading />;
   }
 
+  // Show empty state when no reports are available
+  if (availableReports.length === 0 && !isReportsLoading) {
+    return (
+      <ReportSelectionErrorBoundary>
+        <PromptInputButton
+          variant="ghost"
+          className="gap-2 opacity-50 cursor-not-allowed"
+          disabled
+          aria-label="No reports available"
+          aria-describedby="no-reports-help"
+        >
+          <FilesIcon className="size-4" aria-hidden="true" />
+          <span className="text-muted-foreground text-sm">
+            No reports available.
+          </span>
+        </PromptInputButton>
+        <div id="no-reports-help" className="sr-only">
+          No analysis reports are available. Create some reports first to use them in chat.
+        </div>
+      </ReportSelectionErrorBoundary>
+    );
+  }
+
   return (
     <ReportSelectionErrorBoundary>
       <Popover open={isReportModalOpen} onOpenChange={setReportModalOpen}>
@@ -1037,8 +1041,7 @@ function ReportSelectionActionMenu() {
                       }
                     >
                       <div className="flex items-center gap-2">
-                        <div className="size-4" aria-hidden="true" />{" "}
-                        {/* Placeholder for checkbox */}
+                        <div className="size-4" aria-hidden="true" />
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-sm">
                             {report.ticker}
@@ -1178,6 +1181,7 @@ function EnhancedChatInterfaceContent({ className }: { className?: string }) {
     retryLastMessage,
     selectedGPTModel,
     selectedReports,
+    availableReports,
     clearError,
     retryReportFetch,
   } = useEnhancedChatContext();
@@ -1265,8 +1269,14 @@ function EnhancedChatInterfaceContent({ className }: { className?: string }) {
         >
           {messages.length === 0 ? (
             <ConversationEmptyState
-              title="Start a conversation"
-              description="Ask questions about your selected reports to get AI-powered insights"
+              title={availableReports.length === 0 ? "No reports available" : "Start a conversation"}
+              description={
+                availableReports.length === 0
+                  ? "Create some analysis reports first, then return here to chat about them with AI"
+                  : selectedReports.length === 0
+                    ? "Select reports from your analysis to get AI-powered insights"
+                    : "Ask questions about your selected reports to get AI-powered insights"
+              }
               icon={<BotMessageSquare className="size-12" aria-hidden="true" />}
               role="status"
               aria-live="polite"
