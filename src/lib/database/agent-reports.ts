@@ -416,8 +416,10 @@ export class AgentReportsService {
       }
 
       // Add to recentList for sidebar tracking (upsert to handle duplicates)
-      try {
-        await db.recentList.upsert({
+      // Only add to recent list if the report status is "done"
+      if (report.status === "done") {
+        try {
+          await db.recentList.upsert({
           where: {
             unique_user_session: {
               userId,
@@ -433,9 +435,10 @@ export class AgentReportsService {
             viewedAt: new Date(),
           },
         });
-      } catch (error) {
-        // Log but don't fail if recentList update fails
-        console.error('Failed to update recent list:', error);
+        } catch (error) {
+          // Log but don't fail if recentList update fails
+          console.error('Failed to update recent list:', error);
+        }
       }
 
       return this.transformToStockData(report);

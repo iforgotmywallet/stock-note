@@ -19,7 +19,7 @@ export default function MainPageContent({ userId }: MainPageContentProps) {
     // Add a small delay to ensure database transaction is committed
     await new Promise(resolve => setTimeout(resolve, 100))
     
-    // Refresh the table when analysis is completed
+    // Refresh the main table when analysis is started (to show new row)
     if (refreshTableRef.current) {
       await refreshTableRef.current()
     }

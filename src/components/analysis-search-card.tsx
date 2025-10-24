@@ -136,7 +136,7 @@ const AnalysisSearchCardContent = ({
           analysts: [],
         });
 
-        // Notify parent component to refresh the table
+        // Notify parent component to refresh the main table (but not sidebar)
         if (onAnalysisComplete) {
           onAnalysisComplete();
         }

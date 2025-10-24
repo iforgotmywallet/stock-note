@@ -194,19 +194,25 @@ export const generateAnalysis = inngest.createFunction(
     );
 
     // Step 3: Send POST request to analysis service
+    console.log(`Sending analysis request for ${ticker} (${sessionId})`);
+
+    const requestBody = {
+      session_id: sessionId,
+      ticker,
+      date,
+      userId,
+      published,
+      analysts,
+      config: {
+        llm_provider: env.NEXT_PUBLIC_LLM_PROVIDER,
+      },
+    };
+
+    console.log("Request body:", JSON.stringify(requestBody, null, 2));
+
     const response = await step.fetch(env.STOCK_ANALYZE_URL, {
       method: "POST",
-      body: JSON.stringify({
-        session_id: sessionId,
-        ticker,
-        date,
-        userId,
-        published,
-        analysts,
-        config: {
-          llm_provider: env.NEXT_PUBLIC_LLM_PROVIDER,
-        },
-      }),
+      body: JSON.stringify(requestBody),
       headers: {
         "Content-Type": "application/json",
         "Modal-Key": env.MODAL_KEY,
@@ -214,12 +220,41 @@ export const generateAnalysis = inngest.createFunction(
       },
     });
 
+    console.log(
+      `Analysis service response: ${response.status} ${response.statusText}`,
+    );
+
+    // Parse and validate response
+    let result;
+    try {
+      result = await response.json();
+      console.log("Parsed response:", JSON.stringify(result, null, 2));
+    } catch (parseError) {
+      console.error("Failed to parse response JSON:", parseError);
+
+      // Update status to failed
+      try {
+        await db.agent_reports.update({
+          where: { session_id: sessionId },
+          data: { status: "failed", updated_at: new Date() },
+        });
+      } catch (updateError) {
+        console.error(
+          "Failed to update report status after JSON parse error:",
+          updateError,
+        );
+      }
+
+      throw new Error("Invalid response from analysis service");
+    }
+
     if (!response.ok) {
       console.error("Analysis service request failed:", {
         status: response.status,
         statusText: response.statusText,
         sessionId,
         ticker,
+        responseBody: result,
       });
 
       // Update existing entry in agent_reports table with status "failed"
@@ -240,10 +275,15 @@ export const generateAnalysis = inngest.createFunction(
         );
       }
 
-      // Provide more specific error messages
+      // Extract error message from response if available
       let errorMessage = `Analysis request failed: ${response.statusText}`;
-      if (response.status === 401 || response.status === 403) {
+      if (result?.error?.message) {
+        errorMessage = `Analysis failed: ${result.error.message}`;
+      } else if (response.status === 401 || response.status === 403) {
         errorMessage = "Authentication failed with analysis service";
+      } else if (response.status === 422) {
+        errorMessage =
+          "Analysis service validation error - please check your input parameters";
       } else if (response.status === 429) {
         errorMessage = "Analysis service rate limit exceeded";
       } else if (response.status >= 500) {
@@ -253,7 +293,31 @@ export const generateAnalysis = inngest.createFunction(
       throw new Error(errorMessage);
     }
 
-    const result = await response.json();
+    // Check if the response indicates success even with 200 status
+    if (result?.success === false) {
+      console.error("Analysis service returned success=false:", {
+        sessionId,
+        ticker,
+        responseBody: result,
+      });
+
+      // Update status to failed
+      try {
+        await db.agent_reports.update({
+          where: { session_id: sessionId },
+          data: { status: "failed", updated_at: new Date() },
+        });
+      } catch (updateError) {
+        console.error(
+          "Failed to update report status after success=false:",
+          updateError,
+        );
+      }
+
+      const errorMessage =
+        result?.error?.message || "Analysis execution failed";
+      throw new Error(errorMessage);
+    }
     const analysisResult = {
       success: true,
       message: "Analysis request completed successfully",

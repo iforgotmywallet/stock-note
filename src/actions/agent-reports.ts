@@ -186,11 +186,12 @@ export async function bulkSaveReports(
   }
 
   try {
-    // First verify all session IDs belong to reports owned by the user
+    // First verify all session IDs belong to reports owned by the user AND have "done" status
     const reports = await db.agent_reports.findMany({
       where: {
         session_id: { in: sessionIds },
         userId,
+        status: "done", // Only allow "done" status reports
       },
       select: { session_id: true },
     });

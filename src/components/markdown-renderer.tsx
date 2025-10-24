@@ -96,9 +96,7 @@ const components: Components = {
       {children}
     </thead>
   ),
-  tbody: ({ children, ...props }) => (
-    <tbody {...props}>{children}</tbody>
-  ),
+  tbody: ({ children, ...props }) => <tbody {...props}>{children}</tbody>,
   tr: ({ children, ...props }) => (
     <tr className="border-border border-b" {...props}>
       {children}
@@ -131,19 +129,67 @@ const components: Components = {
       {children}
     </a>
   ),
-  hr: ({ ...props }) => (
-    <hr className="border-border my-4" {...props} />
-  ),
+  hr: ({ ...props }) => <hr className="border-border my-4" {...props} />,
 };
+
+// Function to decode HTML entities
+function decodeHtmlEntities(text: string): string {
+  try {
+    // Use DOM method if available (client-side)
+    if (typeof document !== "undefined") {
+      const textarea = document.createElement("textarea");
+      textarea.innerHTML = text;
+      return textarea.value;
+    }
+  } catch (error) {
+    console.warn("Failed to decode HTML entities using DOM method:", error);
+  }
+
+  // Fallback: manually decode common HTML entities
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+// Function to clean and prepare markdown content
+function cleanMarkdownContent(content: string): string {
+  // Decode HTML entities
+  let cleaned = decodeHtmlEntities(content);
+
+  // Fix common markdown issues
+  cleaned = cleaned
+    // Remove markdown code block wrappers if the entire content is wrapped
+    .replace(/^```markdown\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    // Remove any remaining stray backticks at start/end
+    .replace(/^```\s*\n?/gm, "")
+    .replace(/\n?```\s*$/gm, "")
+    // Ensure proper spacing around headers
+    .replace(/^(#{1,6})\s*/gm, "$1 ")
+    // Fix table formatting issues
+    .replace(/\|\s*\|\s*\|/g, "| | |")
+    // Clean up extra whitespace but preserve intentional line breaks
+    .replace(/\n{3,}/g, "\n\n")
+    // Trim leading/trailing whitespace
+    .trim();
+
+  return cleaned;
+}
 
 export function MarkdownRenderer({
   content,
   className = "",
 }: MarkdownRendererProps) {
+  const cleanedContent = cleanMarkdownContent(content);
+
   return (
     <div className={`prose prose-sm max-w-none ${className}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {content}
+        {cleanedContent}
       </ReactMarkdown>
     </div>
   );

@@ -14,6 +14,8 @@ import {
 } from "@tabler/icons-react";
 
 import { Button } from "~/components/ui/button";
+import { ButtonGroup } from "~/components/ui/button-group";
+import { Badge } from "~/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "~/components/ui/tabs";
 import {
   Card,
@@ -23,6 +25,7 @@ import {
   CardContent,
 } from "~/components/ui/card";
 import { MarkdownRenderer } from "~/components/markdown-renderer";
+import { extractLocalTimeFromSessionId } from "~/lib/utils";
 import type { StockData } from "~/types/stock-data";
 
 interface StockAnalysisDashboardProps {
@@ -38,6 +41,12 @@ export function StockAnalysisDashboard({
 }: StockAnalysisDashboardProps) {
   const [activeTab, setActiveTab] = React.useState("overview");
   const [stockData, setStockData] = React.useState<StockData | null>(null);
+  const [debateView, setDebateView] = React.useState<"bull" | "bear" | "judge">(
+    "bull",
+  );
+  const [riskView, setRiskView] = React.useState<
+    "risky" | "safe" | "neutral" | "judge"
+  >("risky");
 
   // Load stock analysis data
   React.useEffect(() => {
@@ -69,7 +78,7 @@ export function StockAnalysisDashboard({
     const priceMatch = priceRegex.exec(stockData.analysis.market_report);
 
     return {
-      currentPrice: priceMatch ? `$${priceMatch[1]} 💰` : "N/A",
+      currentPrice: priceMatch ? `${priceMatch[1]}` : "N/A",
     };
   }, [stockData]);
 
@@ -110,8 +119,8 @@ export function StockAnalysisDashboard({
       <div className="container mx-auto max-w-7xl">
         {/* Header Section */}
         <div className="mb-8 flex flex-col items-start justify-between sm:flex-row sm:items-center sm:px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">
                 {stockData?.ticker ?? "LOADING"}
               </h1>
@@ -119,16 +128,37 @@ export function StockAnalysisDashboard({
                 className="h-5 w-5 text-blue-600 drop-shadow-sm"
                 title="Verified Report"
               />
+              {sessionId && (
+                <Badge variant="secondary" className="font-mono">
+                  #
+                  {sessionId.split("_").pop()?.slice(-8) ?? sessionId.slice(-8)}
+                </Badge>
+              )}
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-              <span className="text-lg font-semibold">
-                {extractedData?.currentPrice ?? "Loading..."}
+            <p className="text-muted-foreground">
+              At{" "}
+              <span className="text-foreground bg-accent rounded-md px-1.5 py-0.5 font-mono">
+                {(() => {
+                  if (sessionId) {
+                    const localTime = extractLocalTimeFromSessionId(sessionId);
+                    if (localTime) {
+                      return localTime.toLocaleString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                    }
+                  }
+                  return stockData?.date ?? "Loading...";
+                })()}
               </span>
-
-              <span className="text-muted-foreground">
-                {stockData?.date ?? "Loading..."}
+              , the price is{" "}
+              <span className="rounded-md bg-green-50 px-1.5 py-0.5 font-mono text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                ${extractedData?.currentPrice ?? "Loading..."}
               </span>
-            </div>
+            </p>
           </div>
           <Button
             size="sm"
@@ -252,8 +282,8 @@ export function StockAnalysisDashboard({
                   <CardHeader>
                     <CardTitle>Technical Analysis Report</CardTitle>
                     <CardDescription>
-                      Comprehensive analysis of {stockData.ticker}&apos;s current
-                      technical position
+                      Comprehensive analysis of {stockData.ticker}&apos;s
+                      current technical position
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -435,86 +465,120 @@ export function StockAnalysisDashboard({
           <TabsContent value="debate" className="mt-6 px-4 sm:px-6">
             <div className="space-y-4 sm:space-y-6">
               <div className="mb-6">
-                <h2 className="text-xl font-semibold tracking-tight">
-                  Investment Debate
-                </h2>
-                <p className="text-muted-foreground">
-                  Bull vs Bear analysis and expert judgment
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold tracking-tight">
+                      Investment Debate
+                    </h2>
+                    <p className="text-muted-foreground">
+                      Bull vs Bear analysis and expert judgment
+                    </p>
+                  </div>
+                  <ButtonGroup>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDebateView("bull")}
+                      className={`h-8 px-3 ${
+                        debateView === "bull"
+                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      🐂 Bull
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDebateView("bear")}
+                      className={`h-8 px-3 ${
+                        debateView === "bear"
+                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      🐻 Bear
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDebateView("judge")}
+                      className={`h-8 px-3 ${
+                        debateView === "judge"
+                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      ⚖️ Judge
+                    </Button>
+                  </ButtonGroup>
+                </div>
               </div>
 
               {/* Investment Debate */}
               {stockData?.analysis?.investment_debate ? (
                 <div className="space-y-6">
+                  {/* Investment Debate Analysis - Show based on selected view */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Bull Analysis</CardTitle>
+                      <CardTitle>
+                        {debateView === "bull" && "🐂 Bull Analysis"}
+                        {debateView === "bear" && "🐻 Bear Analysis"}
+                        {debateView === "judge" && "⚖️ Judge Decision"}
+                      </CardTitle>
                       <CardDescription>
-                        Optimistic perspective on the investment opportunity
+                        {debateView === "bull" &&
+                          "Optimistic perspective on the investment opportunity"}
+                        {debateView === "bear" &&
+                          "Conservative perspective highlighting potential risks"}
+                        {debateView === "judge" &&
+                          "Expert analysis weighing both perspectives"}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {stockData.analysis.investment_debate.bull_analysis ? (
-                        <MarkdownRenderer
-                          content={
-                            stockData.analysis.investment_debate.bull_analysis
-                          }
-                        />
-                      ) : (
-                        <div className="bg-muted rounded-lg p-4">
-                          <p className="text-muted-foreground text-sm">
-                            Bull analysis is not available for this report.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Bear Analysis</CardTitle>
-                      <CardDescription>
-                        Conservative perspective highlighting potential risks
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {stockData.analysis.investment_debate.bear_analysis ? (
-                        <MarkdownRenderer
-                          content={
-                            stockData.analysis.investment_debate.bear_analysis
-                          }
-                        />
-                      ) : (
-                        <div className="bg-muted rounded-lg p-4">
-                          <p className="text-muted-foreground text-sm">
-                            Bear analysis is not available for this report.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Judge Decision</CardTitle>
-                      <CardDescription>
-                        Expert analysis weighing both perspectives
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {stockData.analysis.investment_debate.judge_decision ? (
-                        <MarkdownRenderer
-                          content={
-                            stockData.analysis.investment_debate.judge_decision
-                          }
-                        />
-                      ) : (
-                        <div className="bg-muted rounded-lg p-4">
-                          <p className="text-muted-foreground text-sm">
-                            Judge decision is not available for this report.
-                          </p>
-                        </div>
-                      )}
+                      {debateView === "bull" &&
+                        (stockData.analysis.investment_debate.bull_analysis ? (
+                          <MarkdownRenderer
+                            content={
+                              stockData.analysis.investment_debate.bull_analysis
+                            }
+                          />
+                        ) : (
+                          <div className="bg-muted rounded-lg p-4">
+                            <p className="text-muted-foreground text-sm">
+                              Bull analysis is not available for this report.
+                            </p>
+                          </div>
+                        ))}
+                      {debateView === "bear" &&
+                        (stockData.analysis.investment_debate.bear_analysis ? (
+                          <MarkdownRenderer
+                            content={
+                              stockData.analysis.investment_debate.bear_analysis
+                            }
+                          />
+                        ) : (
+                          <div className="bg-muted rounded-lg p-4">
+                            <p className="text-muted-foreground text-sm">
+                              Bear analysis is not available for this report.
+                            </p>
+                          </div>
+                        ))}
+                      {debateView === "judge" &&
+                        (stockData.analysis.investment_debate.judge_decision ? (
+                          <MarkdownRenderer
+                            content={
+                              stockData.analysis.investment_debate
+                                .judge_decision
+                            }
+                          />
+                        ) : (
+                          <div className="bg-muted rounded-lg p-4">
+                            <p className="text-muted-foreground text-sm">
+                              Judge decision is not available for this report.
+                            </p>
+                          </div>
+                        ))}
                     </CardContent>
                   </Card>
                 </div>
@@ -543,113 +607,153 @@ export function StockAnalysisDashboard({
           <TabsContent value="risk" className="mt-6 px-4 sm:px-6">
             <div className="space-y-4 sm:space-y-6">
               <div className="mb-6">
-                <h2 className="text-xl font-semibold tracking-tight">
-                  Risk Assessment
-                </h2>
-                <p className="text-muted-foreground">
-                  Multi-perspective risk analysis and recommendations
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold tracking-tight">
+                      Risk Assessment
+                    </h2>
+                    <p className="text-muted-foreground">
+                      Multi-perspective risk analysis and recommendations
+                    </p>
+                  </div>
+                  <ButtonGroup>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRiskView("risky")}
+                      className={`h-8 px-3 ${
+                        riskView === "risky"
+                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      🔥 High Risk
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRiskView("safe")}
+                      className={`h-8 px-3 ${
+                        riskView === "safe"
+                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      🛡️ Conservative
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRiskView("neutral")}
+                      className={`h-8 px-3 ${
+                        riskView === "neutral"
+                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      ⚖️ Balanced
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRiskView("judge")}
+                      className={`h-8 px-3 ${
+                        riskView === "judge"
+                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      📊 Decision
+                    </Button>
+                  </ButtonGroup>
+                </div>
               </div>
 
               {/* Risk Assessment */}
               {stockData?.analysis?.risk_assessment ? (
                 <div className="space-y-6">
+                  {/* Risk Analysis - Show based on selected view */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>High-Risk Analysis</CardTitle>
+                      <CardTitle>
+                        {riskView === "risky" && "🔥 High-Risk Analysis"}
+                        {riskView === "safe" && "🛡️ Conservative Analysis"}
+                        {riskView === "neutral" && "⚖️ Balanced Analysis"}
+                        {riskView === "judge" && "📊 Risk Assessment Decision"}
+                      </CardTitle>
                       <CardDescription>
-                        Aggressive investment perspective focusing on
-                        high-reward opportunities
+                        {riskView === "risky" &&
+                          "Aggressive investment perspective focusing on high-reward opportunities"}
+                        {riskView === "safe" &&
+                          "Risk-averse perspective emphasizing capital preservation"}
+                        {riskView === "neutral" &&
+                          "Moderate approach balancing risk and reward"}
+                        {riskView === "judge" &&
+                          "Final risk evaluation and recommendation"}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {stockData.analysis.risk_assessment.risky_analysis ? (
-                        <MarkdownRenderer
-                          content={
-                            stockData.analysis.risk_assessment.risky_analysis
-                          }
-                        />
-                      ) : (
-                        <div className="bg-muted rounded-lg p-4">
-                          <p className="text-muted-foreground text-sm">
-                            High-risk analysis is not available for this report.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Conservative Analysis</CardTitle>
-                      <CardDescription>
-                        Risk-averse perspective emphasizing capital preservation
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {stockData.analysis.risk_assessment.safe_analysis ? (
-                        <MarkdownRenderer
-                          content={
-                            stockData.analysis.risk_assessment.safe_analysis
-                          }
-                        />
-                      ) : (
-                        <div className="bg-muted rounded-lg p-4">
-                          <p className="text-muted-foreground text-sm">
-                            Conservative analysis is not available for this
-                            report.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Balanced Analysis</CardTitle>
-                      <CardDescription>
-                        Moderate approach balancing risk and reward
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {stockData.analysis.risk_assessment.neutral_analysis ? (
-                        <MarkdownRenderer
-                          content={
-                            stockData.analysis.risk_assessment.neutral_analysis
-                          }
-                        />
-                      ) : (
-                        <div className="bg-muted rounded-lg p-4">
-                          <p className="text-muted-foreground text-sm">
-                            Balanced analysis is not available for this report.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Risk Assessment Decision</CardTitle>
-                      <CardDescription>
-                        Final risk evaluation and recommendation
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {stockData.analysis.risk_assessment.judge_decision ? (
-                        <MarkdownRenderer
-                          content={
-                            stockData.analysis.risk_assessment.judge_decision
-                          }
-                        />
-                      ) : (
-                        <div className="bg-muted rounded-lg p-4">
-                          <p className="text-muted-foreground text-sm">
-                            Risk assessment decision is not available for this
-                            report.
-                          </p>
-                        </div>
-                      )}
+                      {riskView === "risky" &&
+                        (stockData.analysis.risk_assessment.risky_analysis ? (
+                          <MarkdownRenderer
+                            content={
+                              stockData.analysis.risk_assessment.risky_analysis
+                            }
+                          />
+                        ) : (
+                          <div className="bg-muted rounded-lg p-4">
+                            <p className="text-muted-foreground text-sm">
+                              High-risk analysis is not available for this
+                              report.
+                            </p>
+                          </div>
+                        ))}
+                      {riskView === "safe" &&
+                        (stockData.analysis.risk_assessment.safe_analysis ? (
+                          <MarkdownRenderer
+                            content={
+                              stockData.analysis.risk_assessment.safe_analysis
+                            }
+                          />
+                        ) : (
+                          <div className="bg-muted rounded-lg p-4">
+                            <p className="text-muted-foreground text-sm">
+                              Conservative analysis is not available for this
+                              report.
+                            </p>
+                          </div>
+                        ))}
+                      {riskView === "neutral" &&
+                        (stockData.analysis.risk_assessment.neutral_analysis ? (
+                          <MarkdownRenderer
+                            content={
+                              stockData.analysis.risk_assessment
+                                .neutral_analysis
+                            }
+                          />
+                        ) : (
+                          <div className="bg-muted rounded-lg p-4">
+                            <p className="text-muted-foreground text-sm">
+                              Balanced analysis is not available for this
+                              report.
+                            </p>
+                          </div>
+                        ))}
+                      {riskView === "judge" &&
+                        (stockData.analysis.risk_assessment.judge_decision ? (
+                          <MarkdownRenderer
+                            content={
+                              stockData.analysis.risk_assessment.judge_decision
+                            }
+                          />
+                        ) : (
+                          <div className="bg-muted rounded-lg p-4">
+                            <p className="text-muted-foreground text-sm">
+                              Risk assessment decision is not available for this
+                              report.
+                            </p>
+                          </div>
+                        ))}
                     </CardContent>
                   </Card>
                 </div>
@@ -715,42 +819,6 @@ export function StockAnalysisDashboard({
                         Trading plan analysis is not available for this report.
                         This may be because the analysis is still in progress or
                         the data could not be retrieved.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Final Recommendation */}
-              {stockData?.analysis?.final_recommendation ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Final Investment Recommendation</CardTitle>
-                    <CardDescription>
-                      Detailed final recommendation with rationale and action
-                      plan
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <MarkdownRenderer
-                      content={stockData.analysis.final_recommendation}
-                    />
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Final Investment Recommendation</CardTitle>
-                    <CardDescription>
-                      Final recommendation data is not available
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-muted rounded-lg p-4">
-                      <p className="text-muted-foreground text-sm">
-                        Final investment recommendation is not available for
-                        this report. This may be because the analysis is still
-                        in progress or the data could not be retrieved.
                       </p>
                     </div>
                   </CardContent>

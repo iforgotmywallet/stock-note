@@ -349,14 +349,17 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
     }
   }, [isRefreshing, isLoading, maxItems]);
 
-  // Listen for sidebar refresh events from other components
+  // Listen for sidebar refresh events only when opening documents
   useEffect(() => {
     const handleSidebarRefresh = (event: CustomEvent) => {
-      console.log("Received sidebar refresh event:", event.detail);
-      if (!isRefreshing && !isLoading) {
-        setTimeout(() => {
-          refreshDocuments();
-        }, 200); // Slightly longer delay to ensure API call completes
+      // Only refresh when opening a document, not for other actions
+      if (event.detail?.action === "documentOpen") {
+        console.log("Refreshing sidebar due to document open");
+        if (!isRefreshing && !isLoading) {
+          setTimeout(() => {
+            refreshDocuments();
+          }, 200);
+        }
       }
     };
 
@@ -365,7 +368,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
     return () => {
       window.removeEventListener('sidebarRefresh', handleSidebarRefresh as EventListener);
     };
-  }, [isRefreshing, isLoading]); // Don't include refreshDocuments to avoid infinite loop
+  }, [isRefreshing, isLoading, refreshDocuments]);
 
   // Loading skeleton
   const renderLoadingSkeleton = () => (

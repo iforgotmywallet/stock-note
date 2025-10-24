@@ -4,6 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import { AgentReportsService } from "~/lib/database/agent-reports";
 import { StockAnalysisDashboard } from "~/components/stock-analysis-dashboard";
 import { DocumentAccessDenied } from "~/components/document-access-denied";
+import { DocumentSidebarRefresh } from "~/components/document-sidebar-refresh";
 
 // Force dynamic rendering since we need user session and dynamic data
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,7 @@ export default async function ReportDashboardPage({ params }: PageProps) {
     // Render the dashboard with the report data
     return (
       <div className="container mx-auto p-6">
+        <DocumentSidebarRefresh />
         <StockAnalysisDashboard reportData={reportData} sessionId={sessionId} />
       </div>
     );

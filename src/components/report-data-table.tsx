@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -155,13 +156,14 @@ interface ReportDataTableProps {
 const createColumns = (
   onTogglePublish: (id: string, ticker: string, published: boolean) => void,
   onDelete: (id: string, ticker: string) => void,
+  updateSidebarAsync: (sessionId: string) => void,
   showIdColumn: boolean = false,
 ): ColumnDef<AgentReportRow>[] => {
   const columns: ColumnDef<AgentReportRow>[] = [
     {
       id: "select",
       header: ({ table }) => (
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={
               table.getIsAllPageRowsSelected() ||
@@ -173,7 +175,7 @@ const createColumns = (
         </div>
       ),
       cell: ({ row }) => (
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -206,7 +208,13 @@ const createColumns = (
     accessorKey: "ticker",
     header: "Name",
     cell: ({ row }) => (
-      <div className="text-foreground font-medium">{row.original.ticker}</div>
+      <Link 
+        href={`/document/${row.original.sessionId}`}
+        className="text-foreground font-medium hover:underline"
+        onClick={() => updateSidebarAsync(row.original.sessionId)}
+      >
+        {row.original.ticker}
+      </Link>
     ),
     enableHiding: false,
     enableSorting: true,
@@ -301,15 +309,62 @@ const createColumns = (
   },
   {
     accessorKey: "analysisDate",
-    header: "Analysis Date",
+    header: ({ column }) => {
+      const [popoverOpen, setPopoverOpen] = React.useState(false);
+      
+      const handleSort = (direction: "asc" | "desc") => {
+        column.toggleSorting(direction === "desc");
+        setPopoverOpen(false);
+      };
+
+      return (
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-auto p-0 font-medium hover:bg-transparent"
+            >
+              <span>Analysis Date</span>
+              <IconChevronDown className="ml-1 h-3 w-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-32 p-1" align="start">
+            <div className="space-y-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs"
+                onClick={() => handleSort("asc")}
+              >
+                <IconSortAscending2 className="mr-2 h-3 w-3" />
+                Asc
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs"
+                onClick={() => handleSort("desc")}
+              >
+                <IconSortDescending2 className="mr-2 h-3 w-3" />
+                Desc
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      );
+    },
     cell: ({ row }) => (
-      <div className="text-muted-foreground text-sm whitespace-nowrap">
+      <Link 
+        href={`/document/${row.original.sessionId}`}
+        className="text-muted-foreground text-sm whitespace-nowrap hover:underline"
+        onClick={() => updateSidebarAsync(row.original.sessionId)}
+      >
         {row.original.analysisDate.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
           year: "numeric",
         })}
-      </div>
+      </Link>
     ),
     enableSorting: true,
   },
@@ -320,11 +375,6 @@ const createColumns = (
       
       const handleSort = (direction: "asc" | "desc") => {
         column.toggleSorting(direction === "desc");
-        setPopoverOpen(false);
-      };
-
-      const handleHide = () => {
-        column.toggleVisibility(false);
         setPopoverOpen(false);
       };
 
@@ -358,15 +408,6 @@ const createColumns = (
               >
                 <IconSortDescending2 className="mr-2 h-3 w-3" />
                 Desc
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-xs"
-                onClick={handleHide}
-              >
-                <IconEyeOff className="mr-2 h-3 w-3" />
-                Hide
               </Button>
             </div>
           </PopoverContent>
@@ -415,15 +456,20 @@ const createColumns = (
       // Handle case where recommendation exists
       if (recommendation && recommendation.trim() !== "") {
         return (
-          <Badge
-            variant="outline"
-            className="border-border bg-background text-foreground hover:bg-muted flex items-center gap-1.5 px-2 py-1 text-xs whitespace-nowrap"
+          <Link 
+            href={`/document/${row.original.sessionId}`}
+            onClick={() => updateSidebarAsync(row.original.sessionId)}
           >
-            <span className="text-sm">
-              {getRecommendationEmoji(recommendation)}
-            </span>
-            <span>{recommendation}</span>
-          </Badge>
+            <Badge
+              variant="outline"
+              className="border-border bg-background text-foreground hover:bg-muted flex items-center gap-1.5 px-2 py-1 text-xs whitespace-nowrap cursor-pointer"
+            >
+              <span className="text-sm">
+                {getRecommendationEmoji(recommendation)}
+              </span>
+              <span>{recommendation}</span>
+            </Badge>
+          </Link>
         );
       }
 
@@ -450,6 +496,7 @@ const createColumns = (
             variant="ghost"
             className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
             size="icon"
+            onClick={(e) => e.stopPropagation()}
           >
             <IconDotsVertical />
             <span className="sr-only">Open menu</span>
@@ -457,20 +504,24 @@ const createColumns = (
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
           <DropdownMenuItem
-            onClick={() =>
+            onClick={(e) => {
+              e.stopPropagation();
               onTogglePublish(
                 row.original.id,
                 row.original.ticker,
                 row.original.published,
-              )
-            }
+              );
+            }}
           >
             {row.original.published ? "Unpublish" : "Publish"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
-            onClick={() => onDelete(row.original.id, row.original.ticker)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(row.original.id, row.original.ticker);
+            }}
           >
             Remove
           </DropdownMenuItem>
@@ -488,7 +539,6 @@ export function ReportDataTable({
   onRefreshReady,
   showIdColumn = false,
 }: ReportDataTableProps) {
-  // Navigation
   const router = useRouter();
 
   // State management
@@ -592,7 +642,7 @@ export function ReportDataTable({
     void fetchData();
   }, [fetchData]);
 
-  // Expose refresh function to parent component
+  // Expose refresh function to parent component for main table refresh
   React.useEffect(() => {
     if (onRefreshReady) {
       onRefreshReady(handleRefresh);
@@ -691,12 +741,7 @@ export function ReportDataTable({
           prevData.filter((report) => report.id !== reportId),
         );
         
-        // Dispatch sidebar refresh event
-        window.dispatchEvent(
-          new CustomEvent("sidebarRefresh", {
-            detail: { action: "delete", reportId },
-          }),
-        );
+        // Report deleted successfully
       } catch (err) {
         console.error("Error deleting report:", err);
 
@@ -764,12 +809,7 @@ export function ReportDataTable({
         // Clear selection
         setRowSelection({});
         
-        // Dispatch sidebar refresh event
-        window.dispatchEvent(
-          new CustomEvent("sidebarRefresh", {
-            detail: { action: "bulkDelete", reportIds, deletedCount: result.deleted },
-          }),
-        );
+        // Reports deleted successfully
       }
       
       if (result.failed.length > 0) {
@@ -821,54 +861,40 @@ export function ReportDataTable({
 
 
 
-  // Handle row click navigation
-  const handleRowClick = React.useCallback(
-    async (sessionId: string, event: React.MouseEvent) => {
-      // Prevent navigation if clicking on buttons or interactive elements
-      const target = event.target as HTMLElement;
-      if (
-        target.closest("button") ||
-        target.closest('[role="button"]') ||
-        target.closest("a")
-      ) {
-        return;
-      }
+  // Simple navigation helper for updating sidebar (optional, lightweight)
+  const updateSidebarAsync = React.useCallback(async (sessionId: string) => {
+    // Fire and forget - don't block navigation
+    try {
+      fetch("/api/reports/sidebar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {}); // Ignore errors
+    } catch (error) {
+      // Ignore errors - this is optional
+    }
+  }, []);
 
-      // Update sidebar ordering before navigation
-      try {
-        console.log("Updating sidebar for sessionId:", sessionId);
-        const response = await fetch("/api/reports/sidebar", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ sessionId }),
-        });
+  // Simple, lightweight row click handler
+  const handleRowClick = React.useCallback((sessionId: string, event: React.MouseEvent) => {
+    // Prevent navigation if clicking on interactive elements
+    const target = event.target as HTMLElement;
+    if (
+      target.closest("button") ||
+      target.closest("a") ||
+      target.closest("input") ||
+      target.closest('[role="checkbox"]') ||
+      target.closest('[role="menuitem"]')
+    ) {
+      return;
+    }
 
-        if (!response.ok) {
-          throw new Error(
-            `API call failed: ${response.status} ${response.statusText}`,
-          );
-        }
-
-        const result = await response.json();
-        console.log("Sidebar update result:", result);
-
-        // Dispatch a custom event to notify the sidebar to refresh
-        window.dispatchEvent(
-          new CustomEvent("sidebarRefresh", {
-            detail: { sessionId },
-          }),
-        );
-      } catch (error) {
-        console.error("Failed to update sidebar ordering:", error);
-        // Continue with navigation even if sidebar update fails
-      }
-
-      router.push(`/document/${sessionId}`);
-    },
-    [router],
-  );
+    // Update sidebar in background (non-blocking)
+    updateSidebarAsync(sessionId);
+    
+    // Navigate immediately
+    router.push(`/document/${sessionId}`);
+  }, [router, updateSidebarAsync]);
 
   // Create columns with handlers
   const columns = React.useMemo(
@@ -877,9 +903,10 @@ export function ReportDataTable({
         (id: string, ticker: string, published: boolean) =>
           openConfirmDialog(published ? "unpublish" : "publish", id, ticker),
         (id: string, ticker: string) => openConfirmDialog("delete", id, ticker),
+        updateSidebarAsync,
         showIdColumn,
       ),
-    [openConfirmDialog, showIdColumn],
+    [openConfirmDialog, showIdColumn, updateSidebarAsync],
   );
 
   const table = useReactTable({
@@ -925,10 +952,21 @@ export function ReportDataTable({
 
   const handleBulkSave = React.useCallback(async () => {
     const selectedRows = table.getFilteredSelectedRowModel().rows;
-    const sessionIds = selectedRows.map(row => row.original.sessionId);
+    const selectedReports = selectedRows.map(row => row.original);
     
-    if (sessionIds.length === 0) return;
+    if (selectedReports.length === 0) return;
 
+    // Validate that all selected reports have "done" status
+    const nonDoneReports = selectedReports.filter(report => report.status !== "done");
+    if (nonDoneReports.length > 0) {
+      const nonDoneTickers = nonDoneReports.map(r => r.ticker).join(", ");
+      toast.error(
+        `Cannot save reports that are not completed. The following reports are not done: ${nonDoneTickers}`
+      );
+      return;
+    }
+
+    const sessionIds = selectedReports.map(report => report.sessionId);
     setBulkOperationLoading(true);
 
     try {
@@ -947,14 +985,7 @@ export function ReportDataTable({
       // Clear selection after successful save
       setRowSelection({});
       
-      // Dispatch sidebar refresh event if any reports were saved
-      if (result.saved > 0) {
-        window.dispatchEvent(
-          new CustomEvent("sidebarRefresh", {
-            detail: { action: "bulkSave", sessionIds, savedCount: result.saved },
-          }),
-        );
-      }
+      // Reports saved successfully
     } catch (err) {
       console.error("Error saving reports:", err);
       
@@ -1031,8 +1062,14 @@ export function ReportDataTable({
         <div className="flex items-center gap-2">
           {/* Bulk Actions Dropdown */}
           {(() => {
-            const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+            const selectedRows = table.getFilteredSelectedRowModel().rows;
+            const selectedCount = selectedRows.length;
+            const selectedReports = selectedRows.map(row => row.original);
+            const nonDoneReports = selectedReports.filter(report => report.status !== "done");
+            const hasNonDoneReports = nonDoneReports.length > 0;
+            
             const isDisabled = selectedCount === 0 || bulkOperationLoading;
+            const isSaveDisabled = isDisabled || hasNonDoneReports;
             
             return (
               <DropdownMenu>
@@ -1059,10 +1096,16 @@ export function ReportDataTable({
                 <DropdownMenuContent align="end" className="w-40">
                   <DropdownMenuItem
                     onClick={handleBulkSave}
-                    disabled={isDisabled}
+                    disabled={isSaveDisabled}
+                    className={hasNonDoneReports ? 'opacity-50' : ''}
                   >
                     <IconBookmark className="mr-2 h-4 w-4" />
                     Save Selected
+                    {hasNonDoneReports && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        (Only done)
+                      </span>
+                    )}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -1170,9 +1213,7 @@ export function ReportDataTable({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    onClick={(event) => {
-                      void handleRowClick(row.original.sessionId, event);
-                    }}
+                    onClick={(event) => handleRowClick(row.original.sessionId, event)}
                     className="hover:bg-muted/50 cursor-pointer transition-colors"
                   >
                     {row.getVisibleCells().map((cell) => (
