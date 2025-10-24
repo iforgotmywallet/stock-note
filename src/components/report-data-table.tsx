@@ -18,6 +18,8 @@ import {
   IconSortDescending2,
   IconChevronDown,
   IconEyeOff,
+  IconTrash,
+  IconBookmark,
 } from "@tabler/icons-react";
 import {
   type ColumnDef,
@@ -80,6 +82,8 @@ import {
   getAgentReports,
   updateReportPublished,
   deleteReport,
+  bulkDeleteReports,
+  bulkSaveReports,
   type AgentReportRow,
 } from "~/actions/agent-reports";
 import { extractHashFromSessionId } from "~/lib/utils";
@@ -512,15 +516,21 @@ export function ReportDataTable({
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = React.useState<{
     open: boolean;
-    type: "delete" | "publish" | "unpublish";
+    type: "delete" | "publish" | "unpublish" | "bulkDelete";
     reportId: string;
     ticker: string;
+    selectedReports?: AgentReportRow[];
+    loading?: boolean;
   }>({
     open: false,
     type: "delete",
     reportId: "",
     ticker: "",
+    loading: false,
   });
+
+  // Bulk operations loading state
+  const [bulkOperationLoading, setBulkOperationLoading] = React.useState(false);
 
   // Data fetching function
   const fetchData = React.useCallback(async () => {
@@ -614,6 +624,10 @@ export function ReportDataTable({
   const handleTogglePublish = React.useCallback(
     async (reportId: string, currentPublished: boolean) => {
       const newPublished = !currentPublished;
+      
+      // Set loading state
+      setConfirmDialog(prev => ({ ...prev, loading: true }));
+
       try {
         await updateReportPublished(reportId, newPublished);
         toast.success(
@@ -640,7 +654,9 @@ export function ReportDataTable({
             err.message.includes("network") ||
             err.message.includes("fetch")
           ) {
-            errorMessage = "Network error - please check your connection";
+            errorMessage = "Network error - please check your connection and try again";
+          } else if (err.message.includes("timeout")) {
+            errorMessage = "Request timed out - please try again";
           } else if (
             err.message.includes("unauthorized") ||
             err.message.includes("permission")
@@ -648,11 +664,14 @@ export function ReportDataTable({
             errorMessage = "You don't have permission to modify this report";
           } else if (err.message.includes("not found")) {
             errorMessage = "Report not found - it may have been deleted";
+          } else if (err.message.includes("database") || err.message.includes("Database")) {
+            errorMessage = "Database temporarily unavailable - please try again later";
           }
         }
 
         toast.error(errorMessage);
       } finally {
+        setConfirmDialog(prev => ({ ...prev, loading: false }));
         closeConfirmDialog();
       }
     },
@@ -661,12 +680,22 @@ export function ReportDataTable({
 
   const handleDelete = React.useCallback(
     async (reportId: string) => {
+      // Set loading state
+      setConfirmDialog(prev => ({ ...prev, loading: true }));
+
       try {
         await deleteReport(reportId);
         toast.success("Report deleted successfully");
         // Remove from local state
         setData((prevData) =>
           prevData.filter((report) => report.id !== reportId),
+        );
+        
+        // Dispatch sidebar refresh event
+        window.dispatchEvent(
+          new CustomEvent("sidebarRefresh", {
+            detail: { action: "delete", reportId },
+          }),
         );
       } catch (err) {
         console.error("Error deleting report:", err);
@@ -678,7 +707,9 @@ export function ReportDataTable({
             err.message.includes("network") ||
             err.message.includes("fetch")
           ) {
-            errorMessage = "Network error - please check your connection";
+            errorMessage = "Network error - please check your connection and try again";
+          } else if (err.message.includes("timeout")) {
+            errorMessage = "Request timed out - please try again";
           } else if (
             err.message.includes("unauthorized") ||
             err.message.includes("permission")
@@ -693,16 +724,86 @@ export function ReportDataTable({
           ) {
             errorMessage =
               "Cannot delete report - it may be referenced by other data";
+          } else if (err.message.includes("database") || err.message.includes("Database")) {
+            errorMessage = "Database temporarily unavailable - please try again later";
           }
         }
 
         toast.error(errorMessage);
       } finally {
+        setConfirmDialog(prev => ({ ...prev, loading: false }));
         closeConfirmDialog();
       }
     },
     [closeConfirmDialog],
   );
+
+
+
+  const handleBulkDeleteConfirmed = React.useCallback(async () => {
+    const selectedReports = confirmDialog.selectedReports;
+    if (!selectedReports || selectedReports.length === 0) return;
+
+    const reportIds = selectedReports.map(report => report.id);
+
+    // Set loading state
+    setConfirmDialog(prev => ({ ...prev, loading: true }));
+    setBulkOperationLoading(true);
+
+    try {
+      const result = await bulkDeleteReports(reportIds, userId);
+      
+      if (result.deleted > 0) {
+        toast.success(`${result.deleted} report${result.deleted === 1 ? '' : 's'} deleted successfully`);
+        
+        // Remove deleted reports from local state
+        setData(prevData => 
+          prevData.filter(report => !reportIds.includes(report.id))
+        );
+        
+        // Clear selection
+        setRowSelection({});
+        
+        // Dispatch sidebar refresh event
+        window.dispatchEvent(
+          new CustomEvent("sidebarRefresh", {
+            detail: { action: "bulkDelete", reportIds, deletedCount: result.deleted },
+          }),
+        );
+      }
+      
+      if (result.failed.length > 0) {
+        const failedCount = result.failed.length;
+        if (result.deleted > 0) {
+          toast.warning(`${result.deleted} report${result.deleted === 1 ? '' : 's'} deleted, but ${failedCount} failed due to permission issues`);
+        } else {
+          toast.error(`Failed to delete ${failedCount} report${failedCount === 1 ? '' : 's'} - you don't have permission to delete these reports`);
+        }
+      }
+    } catch (err) {
+      console.error("Error deleting reports:", err);
+      
+      // Provide specific error messages
+      let errorMessage = "Failed to delete reports";
+      if (err instanceof Error) {
+        if (err.message.includes("network") || err.message.includes("fetch")) {
+          errorMessage = "Network error - please check your connection and try again";
+        } else if (err.message.includes("timeout")) {
+          errorMessage = "Request timed out - please try again";
+        } else if (err.message.includes("permission") || err.message.includes("unauthorized")) {
+          errorMessage = "You don't have permission to delete these reports";
+        } else if (err.message.includes("database") || err.message.includes("Database")) {
+          errorMessage = "Database temporarily unavailable - please try again later";
+        }
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setConfirmDialog(prev => ({ ...prev, loading: false }));
+      setBulkOperationLoading(false);
+      closeConfirmDialog();
+    }
+  }, [confirmDialog.selectedReports, userId, closeConfirmDialog]);
 
   const handleConfirmAction = React.useCallback(async () => {
     if (confirmDialog.type === "delete") {
@@ -713,8 +814,10 @@ export function ReportDataTable({
     ) {
       const currentPublished = confirmDialog.type === "unpublish";
       await handleTogglePublish(confirmDialog.reportId, currentPublished);
+    } else if (confirmDialog.type === "bulkDelete") {
+      await handleBulkDeleteConfirmed();
     }
-  }, [confirmDialog, handleDelete, handleTogglePublish]);
+  }, [confirmDialog, handleDelete, handleTogglePublish, handleBulkDeleteConfirmed]);
 
 
 
@@ -804,6 +907,77 @@ export function ReportDataTable({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
+  // Handle bulk actions (defined after table creation)
+  const handleBulkDelete = React.useCallback(async () => {
+    const selectedRows = table.getFilteredSelectedRowModel().rows;
+    const selectedReports = selectedRows.map(row => row.original);
+    
+    if (selectedReports.length === 0) return;
+
+    setConfirmDialog({
+      open: true,
+      type: "bulkDelete",
+      reportId: "",
+      ticker: "",
+      selectedReports,
+    });
+  }, [table]);
+
+  const handleBulkSave = React.useCallback(async () => {
+    const selectedRows = table.getFilteredSelectedRowModel().rows;
+    const sessionIds = selectedRows.map(row => row.original.sessionId);
+    
+    if (sessionIds.length === 0) return;
+
+    setBulkOperationLoading(true);
+
+    try {
+      const result = await bulkSaveReports(sessionIds, userId);
+      
+      if (result.saved > 0 && result.skipped > 0) {
+        toast.success(`${result.saved} report${result.saved === 1 ? '' : 's'} saved successfully. ${result.skipped} ${result.skipped === 1 ? 'was' : 'were'} already saved.`);
+      } else if (result.saved > 0) {
+        toast.success(`${result.saved} report${result.saved === 1 ? '' : 's'} saved successfully`);
+      } else if (result.skipped > 0) {
+        toast.info(`All ${result.skipped} report${result.skipped === 1 ? ' was' : 's were'} already saved`);
+      } else {
+        toast.info("No reports were saved");
+      }
+      
+      // Clear selection after successful save
+      setRowSelection({});
+      
+      // Dispatch sidebar refresh event if any reports were saved
+      if (result.saved > 0) {
+        window.dispatchEvent(
+          new CustomEvent("sidebarRefresh", {
+            detail: { action: "bulkSave", sessionIds, savedCount: result.saved },
+          }),
+        );
+      }
+    } catch (err) {
+      console.error("Error saving reports:", err);
+      
+      // Provide specific error messages
+      let errorMessage = "Failed to save reports";
+      if (err instanceof Error) {
+        if (err.message.includes("network") || err.message.includes("fetch")) {
+          errorMessage = "Network error - please check your connection and try again";
+        } else if (err.message.includes("timeout")) {
+          errorMessage = "Request timed out - please try again";
+        } else if (err.message.includes("permission") || err.message.includes("unauthorized")) {
+          errorMessage = "You don't have permission to save these reports";
+        } else if (err.message.includes("database") || err.message.includes("Database")) {
+          errorMessage = "Database temporarily unavailable - please try again later";
+        }
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setBulkOperationLoading(false);
+    }
+  }, [table, userId]);
+
   if (loading) {
     return (
       <div
@@ -855,6 +1029,55 @@ export function ReportDataTable({
           <h2 className="text-lg font-semibold">Analysis Reports 📖</h2>
         </div>
         <div className="flex items-center gap-2">
+          {/* Bulk Actions Dropdown */}
+          {(() => {
+            const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+            const isDisabled = selectedCount === 0 || bulkOperationLoading;
+            
+            return (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isDisabled}
+                    className={`${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {bulkOperationLoading ? (
+                      <>
+                        <IconLoader2 className="mr-1 h-3 w-3 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        Actions{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                        <IconChevronDown className="ml-1 h-3 w-3" />
+                      </>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    onClick={handleBulkSave}
+                    disabled={isDisabled}
+                  >
+                    <IconBookmark className="mr-2 h-4 w-4" />
+                    Save Selected
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleBulkDelete}
+                    disabled={isDisabled}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <IconTrash className="mr-2 h-4 w-4" />
+                    Delete Selected
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          })()}
+
           {/* Status Filter */}
           <Select
             value={
@@ -1060,39 +1283,73 @@ export function ReportDataTable({
       </div>
 
       {/* Confirmation Dialog */}
-      <Dialog open={confirmDialog.open} onOpenChange={closeConfirmDialog}>
+      <Dialog open={confirmDialog.open} onOpenChange={confirmDialog.loading ? undefined : closeConfirmDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {confirmDialog.type === "delete"
                 ? "Delete Report"
-                : confirmDialog.type === "publish"
-                  ? "Publish Report"
-                  : "Unpublish Report"}
+                : confirmDialog.type === "bulkDelete"
+                  ? "Delete Selected Reports"
+                  : confirmDialog.type === "publish"
+                    ? "Publish Report"
+                    : "Unpublish Report"}
             </DialogTitle>
             <DialogDescription>
               {confirmDialog.type === "delete"
-                ? `Are you sure you want to permanently delete the analysis report for ${confirmDialog.ticker}? This action cannot be undone.`
-                : confirmDialog.type === "publish"
-                  ? `Are you sure you want to publish the analysis report for ${confirmDialog.ticker}? This will make it visible to others.`
-                  : `Are you sure you want to unpublish the analysis report for ${confirmDialog.ticker}? This will make it no longer visible to others.`}
+                ? `Are you sure you want to permanently delete the analysis report for ${confirmDialog.ticker}? This action cannot be undone and will remove all associated data.`
+                : confirmDialog.type === "bulkDelete"
+                  ? (() => {
+                      const selectedReports = confirmDialog.selectedReports || [];
+                      const count = selectedReports.length;
+                      const tickers = selectedReports.map(r => r.ticker);
+                      const displayTickers = count <= 5 ? tickers.join(", ") : `${tickers.slice(0, 3).join(", ")} and ${count - 3} more`;
+                      return `Are you sure you want to permanently delete ${count} report${count === 1 ? '' : 's'}? (${displayTickers}) This action cannot be undone and will remove all associated data for these reports.`;
+                    })()
+                  : confirmDialog.type === "publish"
+                    ? `Are you sure you want to publish the analysis report for ${confirmDialog.ticker}? This will make the report visible to other users.`
+                    : `Are you sure you want to unpublish the analysis report for ${confirmDialog.ticker}? This will make the report no longer visible to other users.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={closeConfirmDialog}>
+            <Button 
+              variant="outline" 
+              onClick={closeConfirmDialog}
+              disabled={confirmDialog.loading}
+            >
               Cancel
             </Button>
             <Button
               variant={
-                confirmDialog.type === "delete" ? "destructive" : "default"
+                confirmDialog.type === "delete" || confirmDialog.type === "bulkDelete" 
+                  ? "destructive" 
+                  : "default"
               }
               onClick={handleConfirmAction}
+              disabled={confirmDialog.loading}
             >
-              {confirmDialog.type === "delete"
-                ? "Delete"
-                : confirmDialog.type === "publish"
-                  ? "Publish"
-                  : "Unpublish"}
+              {confirmDialog.loading ? (
+                <>
+                  <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {confirmDialog.type === "delete"
+                    ? "Deleting..."
+                    : confirmDialog.type === "bulkDelete"
+                      ? "Deleting..."
+                      : confirmDialog.type === "publish"
+                        ? "Publishing..."
+                        : "Unpublishing..."}
+                </>
+              ) : (
+                <>
+                  {confirmDialog.type === "delete"
+                    ? "Delete Report"
+                    : confirmDialog.type === "bulkDelete"
+                      ? "Delete Selected"
+                      : confirmDialog.type === "publish"
+                        ? "Publish Report"
+                        : "Unpublish Report"}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "~/lib/auth";
 import { openaiService, type SelectedReport } from "~/lib/openai-service";
 import { MAX_REPORTS_PER_CHAT } from "~/lib/constants";
+import { type GPTModel, isValidGPTModel, DEFAULT_GPT_MODEL } from "~/types/gpt-models";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { message, context } = body;
+    const { message, context, model } = body;
 
     // Validate message input
     if (!message || typeof message !== "string") {
@@ -98,8 +99,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate model parameter (optional, defaults to DEFAULT_GPT_MODEL)
+    let selectedModel: GPTModel = DEFAULT_GPT_MODEL;
+    if (model && typeof model === "string") {
+      // Validate that the model is one of the allowed GPT models
+      if (isValidGPTModel(model)) {
+        selectedModel = model;
+      } else {
+        return NextResponse.json(
+          { error: `Invalid model '${model}'. Supported models: gpt-3.5-turbo, gpt-4, gpt-4-turbo` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Generate streaming response using OpenAI service
-    const completion = await openaiService.createChatCompletion(trimmedMessage, reports);
+    const completion = await openaiService.createChatCompletion(trimmedMessage, reports, selectedModel);
     const stream = openaiService.createResponseStream(completion);
 
     return new Response(stream, {

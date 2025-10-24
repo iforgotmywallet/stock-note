@@ -35,7 +35,10 @@ class SidebarErrorBoundary extends React.Component<
   { children: React.ReactNode; fallback?: React.ReactNode },
   { hasError: boolean; error?: Error }
 > {
-  constructor(props: { children: React.ReactNode; fallback?: React.ReactNode }) {
+  constructor(props: {
+    children: React.ReactNode;
+    fallback?: React.ReactNode;
+  }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -45,16 +48,18 @@ class SidebarErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Sidebar Error Boundary caught an error:', error, errorInfo);
+    console.error("Sidebar Error Boundary caught an error:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
-      return this.props.fallback || (
-        <div className="flex items-center gap-2 p-4 text-sidebar-foreground/50">
-          <IconAlertCircle className="h-4 w-4" />
-          <span className="text-sm">Failed to load sidebar</span>
-        </div>
+      return (
+        this.props.fallback || (
+          <div className="text-sidebar-foreground/50 flex items-center gap-2 p-4">
+            <IconAlertCircle className="h-4 w-4" />
+            <span className="text-sm">Failed to load sidebar</span>
+          </div>
+        )
       );
     }
 
@@ -143,7 +148,11 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    name: string;
+    email: string;
+  } | null>(null);
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -152,14 +161,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         if (session?.data?.user) {
           setCurrentUser({
             id: session.data.user.id,
-            name: session.data.user.name || 'User',
-            email: session.data.user.email || '',
+            name: session.data.user.name || "User",
+            email: session.data.user.email || "",
           });
         } else {
           setCurrentUser(null);
         }
       } catch (error) {
-        console.error('Error getting current user:', error);
+        console.error("Error getting current user:", error);
         setCurrentUser(null);
       }
     };
@@ -200,11 +209,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <SidebarErrorBoundary>
-          <NavUser user={currentUser ? {
-            name: currentUser.name,
-            email: currentUser.email,
-            avatar: "/avatars/shadcn.jpg", // Keep default avatar for now
-          } : data.user} />
+          <NavUser
+            user={
+              currentUser
+                ? {
+                    name: currentUser.name,
+                    email: currentUser.email,
+                    avatar: "/avatars/shadcn.jpg", // Keep default avatar for now
+                  }
+                : data.user
+            }
+          />
         </SidebarErrorBoundary>
       </SidebarFooter>
     </Sidebar>

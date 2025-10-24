@@ -53,7 +53,7 @@ export class AgentReportsService {
           },
         },
         orderBy: {
-          analysis_date: "desc",
+          updated_at: "desc",
         },
       });
 

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { env } from "~/env.js";
 import { MAX_REPORTS_PER_CHAT } from "~/lib/constants";
+import { type GPTModel, getGPTModelConfig, DEFAULT_GPT_MODEL } from "~/types/gpt-models";
 
 // Re-export for backward compatibility
 export { MAX_REPORTS_PER_CHAT };
@@ -84,10 +85,14 @@ export class OpenAIService {
   /**
    * Build context from selected reports for OpenAI with smart truncation
    */
-  buildChatContext(reports: SelectedReport[]): string {
+  buildChatContext(reports: SelectedReport[], model: GPTModel = DEFAULT_GPT_MODEL): string {
     if (!reports || reports.length === 0) {
       return "";
     }
+
+    // Get model configuration for context window size
+    const modelConfig = getGPTModelConfig(model);
+    const maxContextWindow = modelConfig.maxTokens;
 
     // Reserve tokens for system prompt, user message, and response
     const systemPromptTokens = this.estimateTokens(FINANCIAL_SYSTEM_PROMPT);
@@ -96,8 +101,7 @@ export class OpenAIService {
     const reservedTokens =
       systemPromptTokens + maxUserMessageTokens + maxResponseTokens + 500; // 500 buffer
 
-    // GPT-4o-mini has 128k context window
-    const maxContextTokens = 128000 - reservedTokens;
+    const maxContextTokens = maxContextWindow - reservedTokens;
     const tokensPerReport = Math.floor(maxContextTokens / reports.length);
 
     return reports
@@ -119,7 +123,7 @@ export class OpenAIService {
   /**
    * Create streaming chat completion
    */
-  async createChatCompletion(message: string, reports: SelectedReport[] = []) {
+  async createChatCompletion(message: string, reports: SelectedReport[] = [], model: GPTModel = DEFAULT_GPT_MODEL) {
     // Validate inputs
     if (!message || typeof message !== "string") {
       throw new Error("Message is required and must be a string");
@@ -137,7 +141,9 @@ export class OpenAIService {
       throw new Error("Reports must be an array");
     }
 
-    const contextText = this.buildChatContext(reports);
+    // Get model configuration for validation
+    const modelConfig = getGPTModelConfig(model);
+    const contextText = this.buildChatContext(reports, model);
 
     // Validate total context size with more accurate token estimation
     const systemPromptTokens = this.estimateTokens(FINANCIAL_SYSTEM_PROMPT);
@@ -145,13 +151,13 @@ export class OpenAIService {
     const messageTokens = this.estimateTokens(message);
     const totalTokens = systemPromptTokens + contextTokens + messageTokens;
 
-    // GPT-4o-mini has 128k context window, reserve 2k for response
-    const maxInputTokens = 126000;
+    // Use model-specific context window, reserve 2k for response
+    const maxInputTokens = modelConfig.maxTokens - 2000;
 
     if (totalTokens > maxInputTokens) {
       const excessTokens = totalTokens - maxInputTokens;
       throw new Error(
-        `Context is too large by approximately ${excessTokens} tokens. Please select fewer reports or use a shorter message.`,
+        `Context is too large by approximately ${excessTokens} tokens for ${modelConfig.name}. Please select fewer reports or use a shorter message.`,
       );
     }
 
@@ -170,7 +176,7 @@ export class OpenAIService {
 
     try {
       return await this.client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: model,
         messages,
         temperature: 0.7,
         max_tokens: 2000,
@@ -214,20 +220,23 @@ export class OpenAIService {
   /**
    * Get context usage information for debugging/user feedback
    */
-  getContextUsage(message: string, reports: SelectedReport[] = []) {
-    const contextText = this.buildChatContext(reports);
+  getContextUsage(message: string, reports: SelectedReport[] = [], model: GPTModel = DEFAULT_GPT_MODEL) {
+    const modelConfig = getGPTModelConfig(model);
+    const contextText = this.buildChatContext(reports, model);
     const systemPromptTokens = this.estimateTokens(FINANCIAL_SYSTEM_PROMPT);
     const contextTokens = this.estimateTokens(contextText);
     const messageTokens = this.estimateTokens(message);
     const totalTokens = systemPromptTokens + contextTokens + messageTokens;
+    const maxInputTokens = modelConfig.maxTokens - 2000; // Reserve for response
 
     return {
+      model: modelConfig.name,
       systemPromptTokens,
       contextTokens,
       messageTokens,
       totalTokens,
-      maxTokens: 126000,
-      remainingTokens: 126000 - totalTokens,
+      maxTokens: maxInputTokens,
+      remainingTokens: maxInputTokens - totalTokens,
       reportsCount: reports.length,
     };
   }
@@ -278,11 +287,20 @@ export class OpenAIService {
 
       if (error.message.includes("model") || error.message.includes("Model")) {
         const modelError = new Error(
-          "Model not available. Please try again later.",
+          "The selected GPT model is not available. Please try a different model or try again later.",
         ) as Error & { status: number; type: string };
         modelError.status = 503;
         modelError.type = "openai";
         return modelError;
+      }
+
+      if (error.message.includes("invalid_request_error") && error.message.includes("model")) {
+        const invalidModelError = new Error(
+          "Invalid model specified. Please select a valid GPT model.",
+        ) as Error & { status: number; type: string };
+        invalidModelError.status = 400;
+        invalidModelError.type = "openai";
+        return invalidModelError;
       }
 
       if (
@@ -298,18 +316,20 @@ export class OpenAIService {
       }
 
       if (error.message.includes("Context is too large")) {
-        // Extract the excess tokens from the error message if available
-        const match = error.message.match(/by approximately (\d+) tokens/);
-        const excessTokens = match && match[1] ? parseInt(match[1], 10) : 0;
+        // Extract the excess tokens and model name from the error message if available
+        const tokenMatch = error.message.match(/by approximately (\d+) tokens/);
+        const modelMatch = error.message.match(/for (GPT-[^.]+)/);
+        const excessTokens = tokenMatch && tokenMatch[1] ? parseInt(tokenMatch[1], 10) : 0;
+        const modelName = modelMatch && modelMatch[1] ? modelMatch[1] : "the selected model";
 
         let helpfulMessage =
-          "The selected reports and message are too large for processing. ";
+          `The selected reports and message are too large for ${modelName}. `;
         if (excessTokens > 0) {
           const reportsToRemove = Math.ceil(excessTokens / 10000); // Rough estimate
-          helpfulMessage += `Try removing ${reportsToRemove} report${reportsToRemove > 1 ? "s" : ""} or shortening your message.`;
+          helpfulMessage += `Try removing ${reportsToRemove} report${reportsToRemove > 1 ? "s" : ""}, shortening your message, or using a model with a larger context window.`;
         } else {
           helpfulMessage +=
-            "Try selecting fewer reports or using a shorter message.";
+            "Try selecting fewer reports, using a shorter message, or choosing a model with a larger context window.";
         }
 
         const contextError = new Error(helpfulMessage) as Error & {
