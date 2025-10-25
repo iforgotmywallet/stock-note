@@ -18,9 +18,10 @@ import {
   IconSortAscending2,
   IconSortDescending2,
   IconChevronDown,
-  IconEyeOff,
   IconTrash,
   IconBookmark,
+  IconMaximize,
+  IconMinimize,
 } from "@tabler/icons-react";
 import {
   type ColumnDef,
@@ -36,7 +37,7 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { z } from "zod";
+
 import { toast } from "sonner";
 
 import { Badge } from "~/components/ui/badge";
@@ -134,48 +135,45 @@ const statusConfig = {
   },
 } as const;
 
-// Define the schema for agent report data
-export const agentReportSchema = z.object({
-  id: z.string(),
-  ticker: z.string(),
-  analysisDate: z.date(),
-  recommendation: z.string(),
-  status: z.enum(["queued", "processing", "done", "failed", "NEC"]),
-  published: z.boolean(),
-  analystTeams: z.array(z.string()),
-});
-
 interface ReportDataTableProps {
   userId: string;
   className?: string;
   onRefreshReady?: (refreshFn: () => Promise<void>) => void;
   showIdColumn?: boolean;
+  isFullScreen?: boolean;
 }
 
 // Create columns with action handlers
 const createColumns = (
   onTogglePublish: (id: string, ticker: string, published: boolean) => void,
   onDelete: (id: string, ticker: string) => void,
-  updateSidebarAsync: (sessionId: string) => void,
   showIdColumn: boolean = false,
 ): ColumnDef<AgentReportRow>[] => {
   const columns: ColumnDef<AgentReportRow>[] = [
     {
       id: "select",
       header: ({ table }) => (
-        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Checkbox
             checked={
               table.getIsAllPageRowsSelected() ||
               (table.getIsSomePageRowsSelected() && "indeterminate")
             }
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
             aria-label="Select all"
           />
         </div>
       ),
       cell: ({ row }) => (
-        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -204,331 +202,328 @@ const createColumns = (
 
   // Add remaining columns
   columns.push(
-  {
-    accessorKey: "ticker",
-    header: "Name",
-    cell: ({ row }) => (
-      <Link 
-        href={`/document/${row.original.sessionId}`}
-        className="text-foreground font-medium hover:underline"
-        onClick={() => updateSidebarAsync(row.original.sessionId)}
-      >
-        {row.original.ticker}
-      </Link>
-    ),
-    enableHiding: false,
-    enableSorting: true,
-  },
-  {
-    accessorKey: "analystTeams",
-    header: "Team",
-    cell: ({ row }) => {
-      const isProcessing =
-        row.original.status === "processing" ||
-        row.original.status === "queued";
-      const hasTeams = row.original.analystTeams.length > 0;
-      const teamCount = row.original.analystTeams.length;
-      const showLoading = isProcessing && teamCount < 4; // Only show loading if not all 4 teams are complete
-
-      return (
-        <div className="flex flex-wrap items-center gap-1">
-          {hasTeams ? (
-            row.original.analystTeams.map((team) => {
-              const config = teamConfig[team as keyof typeof teamConfig];
-              return (
-                <Badge
-                  key={team}
-                  variant={config?.variant ?? "outline"}
-                  className="px-2 py-0.5 text-xs"
-                >
-                  {config?.label ?? team}
-                </Badge>
-              );
-            })
-          ) : (
-            <span className="text-muted-foreground text-xs">
-              Analyst joining
-            </span>
-          )}
-
-          {/* Show loading icon when queued/processing and teams are still being processed */}
-          {showLoading && (
-            <IconLoader2 className="ml-1 size-3 animate-spin text-blue-500" />
-          )}
-        </div>
-      );
+    {
+      accessorKey: "ticker",
+      header: "Name",
+      cell: ({ row }) => (
+        <Link
+          href={`/document/${row.original.sessionId}`}
+          className="text-foreground font-medium hover:underline"
+        >
+          {row.original.ticker}
+        </Link>
+      ),
+      enableHiding: false,
+      enableSorting: true,
     },
-    enableSorting: false,
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const config =
-        statusConfig[row.original.status as keyof typeof statusConfig];
+    {
+      accessorKey: "analystTeams",
+      header: "Team",
+      cell: ({ row }) => {
+        const isProcessing =
+          row.original.status === "processing" ||
+          row.original.status === "queued";
+        const hasTeams = row.original.analystTeams.length > 0;
+        const teamCount = row.original.analystTeams.length;
+        const showLoading = isProcessing && teamCount < 4; // Only show loading if not all 4 teams are complete
 
-      // Fallback for unknown status
-      if (!config) {
         return (
-          <Badge variant="outline" className="px-2 py-0.5 text-xs">
-            {row.original.status}
+          <div className="flex flex-wrap items-center gap-1">
+            {hasTeams ? (
+              row.original.analystTeams.map((team) => {
+                const config = teamConfig[team as keyof typeof teamConfig];
+                return (
+                  <Badge
+                    key={team}
+                    variant={config?.variant ?? "outline"}
+                    className="px-2 py-0.5 text-xs"
+                  >
+                    {config?.label ?? team}
+                  </Badge>
+                );
+              })
+            ) : (
+              <span className="text-muted-foreground text-xs">
+                Analyst joining
+              </span>
+            )}
+
+            {/* Show loading icon when queued/processing and teams are still being processed */}
+            {showLoading && (
+              <IconLoader2 className="ml-1 size-3 animate-spin text-blue-500" />
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const config =
+          statusConfig[row.original.status as keyof typeof statusConfig];
+
+        // Fallback for unknown status
+        if (!config) {
+          return (
+            <Badge variant="outline" className="px-2 py-0.5 text-xs">
+              {row.original.status}
+            </Badge>
+          );
+        }
+
+        const IconComponent = config.icon;
+
+        return (
+          <Badge
+            variant={config.variant}
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs whitespace-nowrap`}
+          >
+            <IconComponent className={`size-3 ${config.iconClassName}`} />
+            {config.label}
           </Badge>
         );
-      }
-
-      const IconComponent = config.icon;
-
-      return (
-        <Badge
-          variant={config.variant}
-          className={`flex items-center gap-1 px-2 py-0.5 text-xs whitespace-nowrap`}
-        >
-          <IconComponent className={`size-3 ${config.iconClassName}`} />
-          {config.label}
-        </Badge>
-      );
+      },
+      enableSorting: true,
+      sortingFn: (rowA, rowB) => {
+        // Define status priority: queued > processing > failed > NEC > done
+        const statusPriority = {
+          queued: 0,
+          processing: 1,
+          failed: 2,
+          NEC: 3,
+          done: 4,
+        };
+        const priorityA =
+          statusPriority[rowA.original.status as keyof typeof statusPriority] ??
+          999;
+        const priorityB =
+          statusPriority[rowB.original.status as keyof typeof statusPriority] ??
+          999;
+        return priorityA - priorityB;
+      },
     },
-    enableSorting: true,
-    sortingFn: (rowA, rowB) => {
-      // Define status priority: queued > processing > failed > NEC > done
-      const statusPriority = {
-        queued: 0,
-        processing: 1,
-        failed: 2,
-        NEC: 3,
-        done: 4,
-      };
-      const priorityA =
-        statusPriority[rowA.original.status as keyof typeof statusPriority] ??
-        999;
-      const priorityB =
-        statusPriority[rowB.original.status as keyof typeof statusPriority] ??
-        999;
-      return priorityA - priorityB;
-    },
-  },
-  {
-    accessorKey: "analysisDate",
-    header: ({ column }) => {
-      const [popoverOpen, setPopoverOpen] = React.useState(false);
-      
-      const handleSort = (direction: "asc" | "desc") => {
-        column.toggleSorting(direction === "desc");
-        setPopoverOpen(false);
-      };
+    {
+      accessorKey: "analysisDate",
+      header: ({ column }) => {
+        const [popoverOpen, setPopoverOpen] = React.useState(false);
 
-      return (
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              className="h-auto p-0 font-medium hover:bg-transparent"
-            >
-              <span>Analysis Date</span>
-              <IconChevronDown className="ml-1 h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-32 p-1" align="start">
-            <div className="space-y-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-xs"
-                onClick={() => handleSort("asc")}
-              >
-                <IconSortAscending2 className="mr-2 h-3 w-3" />
-                Asc
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-xs"
-                onClick={() => handleSort("desc")}
-              >
-                <IconSortDescending2 className="mr-2 h-3 w-3" />
-                Desc
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-      );
-    },
-    cell: ({ row }) => (
-      <Link 
-        href={`/document/${row.original.sessionId}`}
-        className="text-muted-foreground text-sm whitespace-nowrap hover:underline"
-        onClick={() => updateSidebarAsync(row.original.sessionId)}
-      >
-        {row.original.analysisDate.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })}
-      </Link>
-    ),
-    enableSorting: true,
-  },
-  {
-    accessorKey: "updatedAt",
-    header: ({ column }) => {
-      const [popoverOpen, setPopoverOpen] = React.useState(false);
-      
-      const handleSort = (direction: "asc" | "desc") => {
-        column.toggleSorting(direction === "desc");
-        setPopoverOpen(false);
-      };
+        const handleSort = (direction: "asc" | "desc") => {
+          column.toggleSorting(direction === "desc");
+          setPopoverOpen(false);
+        };
 
-      return (
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              className="h-auto p-0 font-medium hover:bg-transparent"
-            >
-              <span>Updated</span>
-              <IconChevronDown className="ml-1 h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-32 p-1" align="start">
-            <div className="space-y-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-xs"
-                onClick={() => handleSort("asc")}
-              >
-                <IconSortAscending2 className="mr-2 h-3 w-3" />
-                Asc
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-xs"
-                onClick={() => handleSort("desc")}
-              >
-                <IconSortDescending2 className="mr-2 h-3 w-3" />
-                Desc
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-      );
-    },
-    cell: ({ row }) => (
-      <div className="text-muted-foreground text-sm whitespace-nowrap">
-        {row.original.updatedAt.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-      </div>
-    ),
-    enableSorting: true,
-  },
-  {
-    accessorKey: "recommendation",
-    header: "Recommendation",
-    cell: ({ row }) => {
-      const { recommendation, status, id, ticker } = row.original;
-
-      // Show progress button if recommendation is null/empty and status is processing
-      if (
-        (!recommendation || recommendation.trim() === "") &&
-        status === "processing"
-      ) {
-        return <ProgressButton reportId={id} ticker={ticker} />;
-      }
-
-      // Helper function to get emoji for recommendation
-      const getRecommendationEmoji = (rec: string) => {
-        const upperRec = rec.toUpperCase();
-        if (upperRec === "BUY" || upperRec === "STRONG BUY") return "🚀";
-        if (upperRec === "SELL" || upperRec === "STRONG SELL") return "💩";
-        if (upperRec === "HOLD") return "⏸️";
-        if (upperRec === "BUY OR HOLD" || upperRec.includes("BUY")) return "🙌";
-        if (upperRec === "SELL OR HOLD" || upperRec.includes("SELL"))
-          return "🙌";
-        return "📊"; // Default for other recommendations
-      };
-
-      // Handle case where recommendation exists
-      if (recommendation && recommendation.trim() !== "") {
         return (
-          <Link 
-            href={`/document/${row.original.sessionId}`}
-            onClick={() => updateSidebarAsync(row.original.sessionId)}
-          >
-            <Badge
-              variant="outline"
-              className="border-border bg-background text-foreground hover:bg-muted flex items-center gap-1.5 px-2 py-1 text-xs whitespace-nowrap cursor-pointer"
-            >
-              <span className="text-sm">
-                {getRecommendationEmoji(recommendation)}
-              </span>
-              <span>{recommendation}</span>
-            </Badge>
-          </Link>
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                <span>Analysis Date</span>
+                <IconChevronDown className="ml-1 h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-32 p-1" align="start">
+              <div className="space-y-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs"
+                  onClick={() => handleSort("asc")}
+                >
+                  <IconSortAscending2 className="mr-2 h-3 w-3" />
+                  Asc
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs"
+                  onClick={() => handleSort("desc")}
+                >
+                  <IconSortDescending2 className="mr-2 h-3 w-3" />
+                  Desc
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         );
-      }
+      },
+      cell: ({ row }) => (
+        <Link
+          href={`/document/${row.original.sessionId}`}
+          className="text-muted-foreground text-sm whitespace-nowrap hover:underline"
+        >
+          <div className="pl-4">
+            {row.original.analysisDate.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </div>
+        </Link>
+      ),
+      enableSorting: true,
+    },
+    {
+      accessorKey: "updatedAt",
+      header: ({ column }) => {
+        const [popoverOpen, setPopoverOpen] = React.useState(false);
 
-      // Fallback for empty recommendation
-      return (
-        <div className="text-muted-foreground text-xs">No recommendation</div>
-      );
+        const handleSort = (direction: "asc" | "desc") => {
+          column.toggleSorting(direction === "desc");
+          setPopoverOpen(false);
+        };
+
+        return (
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                <span>Updated</span>
+                <IconChevronDown className="ml-1 h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-32 p-1" align="start">
+              <div className="space-y-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs"
+                  onClick={() => handleSort("asc")}
+                >
+                  <IconSortAscending2 className="mr-2 h-3 w-3" />
+                  Asc
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs"
+                  onClick={() => handleSort("desc")}
+                >
+                  <IconSortDescending2 className="mr-2 h-3 w-3" />
+                  Desc
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        );
+      },
+      cell: ({ row }) => (
+        <div className="text-muted-foreground text-sm whitespace-nowrap">
+          {row.original.updatedAt.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </div>
+      ),
+      enableSorting: true,
     },
-    enableSorting: false,
-    filterFn: (row, id, value) => {
-      const recommendation = row.getValue(id) as string;
-      if (!recommendation || recommendation.trim() === "") {
-        return false; // Don't show rows without recommendations in filter results
-      }
-      return recommendation === value; // Exact match for database values
+    {
+      accessorKey: "recommendation",
+      header: "Recommendation",
+      cell: ({ row }) => {
+        const { recommendation, status, id, ticker } = row.original;
+
+        // Show progress button if recommendation is null/empty and status is processing
+        if (
+          (!recommendation || recommendation.trim() === "") &&
+          status === "processing"
+        ) {
+          return <ProgressButton reportId={id} ticker={ticker} />;
+        }
+
+        // Helper function to get emoji for recommendation
+        const getRecommendationEmoji = (rec: string) => {
+          const upperRec = rec.toUpperCase();
+          if (upperRec === "BUY" || upperRec === "STRONG BUY") return "🚀";
+          if (upperRec === "SELL" || upperRec === "STRONG SELL") return "💩";
+          if (upperRec === "HOLD") return "⏸️";
+          return "📊"; // Default for other recommendations
+        };
+
+        // Handle case where recommendation exists
+        if (recommendation && recommendation.trim() !== "") {
+          return (
+            <Link
+              href={`/document/${row.original.sessionId}`}
+            >
+              <Badge
+                variant="outline"
+                className="border-border bg-background text-foreground hover:bg-muted flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs whitespace-nowrap"
+              >
+                <span className="text-sm">
+                  {getRecommendationEmoji(recommendation)}
+                </span>
+                <span>{recommendation}</span>
+              </Badge>
+            </Link>
+          );
+        }
+
+        // Fallback for empty recommendation
+        return (
+          <div className="text-muted-foreground text-xs">No recommendation</div>
+        );
+      },
+      enableSorting: false,
+      filterFn: (row, id, value) => {
+        const recommendation = row.getValue(id) as string;
+        if (!recommendation || recommendation.trim() === "") {
+          return false; // Don't show rows without recommendations in filter results
+        }
+        return recommendation === value; // Exact match for database values
+      },
     },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              onTogglePublish(
-                row.original.id,
-                row.original.ticker,
-                row.original.published,
-              );
-            }}
-          >
-            {row.original.published ? "Unpublish" : "Publish"}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(row.original.id, row.original.ticker);
-            }}
-          >
-            Remove
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  });
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+              size="icon"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <IconDotsVertical />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePublish(
+                  row.original.id,
+                  row.original.ticker,
+                  row.original.published,
+                );
+              }}
+            >
+              {row.original.published ? "Unpublish" : "Publish"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(row.original.id, row.original.ticker);
+              }}
+            >
+              Remove
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  );
 
   return columns;
 };
@@ -538,6 +533,7 @@ export function ReportDataTable({
   className,
   onRefreshReady,
   showIdColumn = false,
+  isFullScreen = false,
 }: ReportDataTableProps) {
   const router = useRouter();
 
@@ -587,14 +583,6 @@ export function ReportDataTable({
     try {
       setError(null);
       const reports = await getAgentReports(userId);
-      console.log(
-        "Fetched reports:",
-        reports.map((r) => ({
-          ticker: r.ticker,
-          status: r.status,
-          sessionId: r.sessionId,
-        })),
-      );
       setData(reports);
     } catch (err) {
       console.error("Error fetching reports:", err);
@@ -674,9 +662,9 @@ export function ReportDataTable({
   const handleTogglePublish = React.useCallback(
     async (reportId: string, currentPublished: boolean) => {
       const newPublished = !currentPublished;
-      
+
       // Set loading state
-      setConfirmDialog(prev => ({ ...prev, loading: true }));
+      setConfirmDialog((prev) => ({ ...prev, loading: true }));
 
       try {
         await updateReportPublished(reportId, newPublished);
@@ -704,7 +692,8 @@ export function ReportDataTable({
             err.message.includes("network") ||
             err.message.includes("fetch")
           ) {
-            errorMessage = "Network error - please check your connection and try again";
+            errorMessage =
+              "Network error - please check your connection and try again";
           } else if (err.message.includes("timeout")) {
             errorMessage = "Request timed out - please try again";
           } else if (
@@ -714,14 +703,18 @@ export function ReportDataTable({
             errorMessage = "You don't have permission to modify this report";
           } else if (err.message.includes("not found")) {
             errorMessage = "Report not found - it may have been deleted";
-          } else if (err.message.includes("database") || err.message.includes("Database")) {
-            errorMessage = "Database temporarily unavailable - please try again later";
+          } else if (
+            err.message.includes("database") ||
+            err.message.includes("Database")
+          ) {
+            errorMessage =
+              "Database temporarily unavailable - please try again later";
           }
         }
 
         toast.error(errorMessage);
       } finally {
-        setConfirmDialog(prev => ({ ...prev, loading: false }));
+        setConfirmDialog((prev) => ({ ...prev, loading: false }));
         closeConfirmDialog();
       }
     },
@@ -731,7 +724,7 @@ export function ReportDataTable({
   const handleDelete = React.useCallback(
     async (reportId: string) => {
       // Set loading state
-      setConfirmDialog(prev => ({ ...prev, loading: true }));
+      setConfirmDialog((prev) => ({ ...prev, loading: true }));
 
       try {
         await deleteReport(reportId);
@@ -740,7 +733,7 @@ export function ReportDataTable({
         setData((prevData) =>
           prevData.filter((report) => report.id !== reportId),
         );
-        
+
         // Report deleted successfully
       } catch (err) {
         console.error("Error deleting report:", err);
@@ -752,7 +745,8 @@ export function ReportDataTable({
             err.message.includes("network") ||
             err.message.includes("fetch")
           ) {
-            errorMessage = "Network error - please check your connection and try again";
+            errorMessage =
+              "Network error - please check your connection and try again";
           } else if (err.message.includes("timeout")) {
             errorMessage = "Request timed out - please try again";
           } else if (
@@ -769,77 +763,93 @@ export function ReportDataTable({
           ) {
             errorMessage =
               "Cannot delete report - it may be referenced by other data";
-          } else if (err.message.includes("database") || err.message.includes("Database")) {
-            errorMessage = "Database temporarily unavailable - please try again later";
+          } else if (
+            err.message.includes("database") ||
+            err.message.includes("Database")
+          ) {
+            errorMessage =
+              "Database temporarily unavailable - please try again later";
           }
         }
 
         toast.error(errorMessage);
       } finally {
-        setConfirmDialog(prev => ({ ...prev, loading: false }));
+        setConfirmDialog((prev) => ({ ...prev, loading: false }));
         closeConfirmDialog();
       }
     },
     [closeConfirmDialog],
   );
 
-
-
   const handleBulkDeleteConfirmed = React.useCallback(async () => {
     const selectedReports = confirmDialog.selectedReports;
     if (!selectedReports || selectedReports.length === 0) return;
 
-    const reportIds = selectedReports.map(report => report.id);
+    const reportIds = selectedReports.map((report) => report.id);
 
     // Set loading state
-    setConfirmDialog(prev => ({ ...prev, loading: true }));
+    setConfirmDialog((prev) => ({ ...prev, loading: true }));
     setBulkOperationLoading(true);
 
     try {
       const result = await bulkDeleteReports(reportIds, userId);
-      
+
       if (result.deleted > 0) {
-        toast.success(`${result.deleted} report${result.deleted === 1 ? '' : 's'} deleted successfully`);
-        
-        // Remove deleted reports from local state
-        setData(prevData => 
-          prevData.filter(report => !reportIds.includes(report.id))
+        toast.success(
+          `${result.deleted} report${result.deleted === 1 ? "" : "s"} deleted successfully`,
         );
-        
+
+        // Remove deleted reports from local state
+        setData((prevData) =>
+          prevData.filter((report) => !reportIds.includes(report.id)),
+        );
+
         // Clear selection
         setRowSelection({});
-        
+
         // Reports deleted successfully
       }
-      
+
       if (result.failed.length > 0) {
         const failedCount = result.failed.length;
         if (result.deleted > 0) {
-          toast.warning(`${result.deleted} report${result.deleted === 1 ? '' : 's'} deleted, but ${failedCount} failed due to permission issues`);
+          toast.warning(
+            `${result.deleted} report${result.deleted === 1 ? "" : "s"} deleted, but ${failedCount} failed due to permission issues`,
+          );
         } else {
-          toast.error(`Failed to delete ${failedCount} report${failedCount === 1 ? '' : 's'} - you don't have permission to delete these reports`);
+          toast.error(
+            `Failed to delete ${failedCount} report${failedCount === 1 ? "" : "s"} - you don't have permission to delete these reports`,
+          );
         }
       }
     } catch (err) {
       console.error("Error deleting reports:", err);
-      
+
       // Provide specific error messages
       let errorMessage = "Failed to delete reports";
       if (err instanceof Error) {
         if (err.message.includes("network") || err.message.includes("fetch")) {
-          errorMessage = "Network error - please check your connection and try again";
+          errorMessage =
+            "Network error - please check your connection and try again";
         } else if (err.message.includes("timeout")) {
           errorMessage = "Request timed out - please try again";
-        } else if (err.message.includes("permission") || err.message.includes("unauthorized")) {
+        } else if (
+          err.message.includes("permission") ||
+          err.message.includes("unauthorized")
+        ) {
           errorMessage = "You don't have permission to delete these reports";
-        } else if (err.message.includes("database") || err.message.includes("Database")) {
-          errorMessage = "Database temporarily unavailable - please try again later";
+        } else if (
+          err.message.includes("database") ||
+          err.message.includes("Database")
+        ) {
+          errorMessage =
+            "Database temporarily unavailable - please try again later";
         }
       }
-      
+
       toast.error(errorMessage);
     } finally {
-      setConfirmDialog(prev => ({ ...prev, loading: false }));
+      setConfirmDialog((prev) => ({ ...prev, loading: false }));
       setBulkOperationLoading(false);
       closeConfirmDialog();
     }
@@ -857,44 +867,35 @@ export function ReportDataTable({
     } else if (confirmDialog.type === "bulkDelete") {
       await handleBulkDeleteConfirmed();
     }
-  }, [confirmDialog, handleDelete, handleTogglePublish, handleBulkDeleteConfirmed]);
+  }, [
+    confirmDialog,
+    handleDelete,
+    handleTogglePublish,
+    handleBulkDeleteConfirmed,
+  ]);
 
 
-
-  // Simple navigation helper for updating sidebar (optional, lightweight)
-  const updateSidebarAsync = React.useCallback(async (sessionId: string) => {
-    // Fire and forget - don't block navigation
-    try {
-      fetch("/api/reports/sidebar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      }).catch(() => {}); // Ignore errors
-    } catch (error) {
-      // Ignore errors - this is optional
-    }
-  }, []);
 
   // Simple, lightweight row click handler
-  const handleRowClick = React.useCallback((sessionId: string, event: React.MouseEvent) => {
-    // Prevent navigation if clicking on interactive elements
-    const target = event.target as HTMLElement;
-    if (
-      target.closest("button") ||
-      target.closest("a") ||
-      target.closest("input") ||
-      target.closest('[role="checkbox"]') ||
-      target.closest('[role="menuitem"]')
-    ) {
-      return;
-    }
+  const handleRowClick = React.useCallback(
+    (sessionId: string, event: React.MouseEvent) => {
+      // Prevent navigation if clicking on interactive elements
+      const target = event.target as HTMLElement;
+      if (
+        target.closest("button") ||
+        target.closest("a") ||
+        target.closest("input") ||
+        target.closest('[role="checkbox"]') ||
+        target.closest('[role="menuitem"]')
+      ) {
+        return;
+      }
 
-    // Update sidebar in background (non-blocking)
-    updateSidebarAsync(sessionId);
-    
-    // Navigate immediately
-    router.push(`/document/${sessionId}`);
-  }, [router, updateSidebarAsync]);
+      // Navigate immediately
+      router.push(`/document/${sessionId}`);
+    },
+    [router],
+  );
 
   // Create columns with handlers
   const columns = React.useMemo(
@@ -903,10 +904,9 @@ export function ReportDataTable({
         (id: string, ticker: string, published: boolean) =>
           openConfirmDialog(published ? "unpublish" : "publish", id, ticker),
         (id: string, ticker: string) => openConfirmDialog("delete", id, ticker),
-        updateSidebarAsync,
         showIdColumn,
       ),
-    [openConfirmDialog, showIdColumn, updateSidebarAsync],
+    [openConfirmDialog, showIdColumn],
   );
 
   const table = useReactTable({
@@ -937,8 +937,8 @@ export function ReportDataTable({
   // Handle bulk actions (defined after table creation)
   const handleBulkDelete = React.useCallback(async () => {
     const selectedRows = table.getFilteredSelectedRowModel().rows;
-    const selectedReports = selectedRows.map(row => row.original);
-    
+    const selectedReports = selectedRows.map((row) => row.original);
+
     if (selectedReports.length === 0) return;
 
     setConfirmDialog({
@@ -952,57 +952,73 @@ export function ReportDataTable({
 
   const handleBulkSave = React.useCallback(async () => {
     const selectedRows = table.getFilteredSelectedRowModel().rows;
-    const selectedReports = selectedRows.map(row => row.original);
-    
+    const selectedReports = selectedRows.map((row) => row.original);
+
     if (selectedReports.length === 0) return;
 
     // Validate that all selected reports have "done" status
-    const nonDoneReports = selectedReports.filter(report => report.status !== "done");
+    const nonDoneReports = selectedReports.filter(
+      (report) => report.status !== "done",
+    );
     if (nonDoneReports.length > 0) {
-      const nonDoneTickers = nonDoneReports.map(r => r.ticker).join(", ");
+      const nonDoneTickers = nonDoneReports.map((r) => r.ticker).join(", ");
       toast.error(
-        `Cannot save reports that are not completed. The following reports are not done: ${nonDoneTickers}`
+        `Cannot save reports that are not completed. The following reports are not done: ${nonDoneTickers}`,
       );
       return;
     }
 
-    const sessionIds = selectedReports.map(report => report.sessionId);
+    const sessionIds = selectedReports.map((report) => report.sessionId);
     setBulkOperationLoading(true);
 
     try {
       const result = await bulkSaveReports(sessionIds, userId);
-      
+
       if (result.saved > 0 && result.skipped > 0) {
-        toast.success(`${result.saved} report${result.saved === 1 ? '' : 's'} saved successfully. ${result.skipped} ${result.skipped === 1 ? 'was' : 'were'} already saved.`);
+        toast.success(
+          `${result.saved} report${result.saved === 1 ? "" : "s"} saved successfully. ${result.skipped} ${result.skipped === 1 ? "was" : "were"} already saved.`,
+        );
       } else if (result.saved > 0) {
-        toast.success(`${result.saved} report${result.saved === 1 ? '' : 's'} saved successfully`);
+        toast.success(
+          `${result.saved} report${result.saved === 1 ? "" : "s"} saved successfully`,
+        );
       } else if (result.skipped > 0) {
-        toast.info(`All ${result.skipped} report${result.skipped === 1 ? ' was' : 's were'} already saved`);
+        toast.info(
+          `All ${result.skipped} report${result.skipped === 1 ? " was" : "s were"} already saved`,
+        );
       } else {
         toast.info("No reports were saved");
       }
-      
+
       // Clear selection after successful save
       setRowSelection({});
-      
+
       // Reports saved successfully
     } catch (err) {
       console.error("Error saving reports:", err);
-      
+
       // Provide specific error messages
       let errorMessage = "Failed to save reports";
       if (err instanceof Error) {
         if (err.message.includes("network") || err.message.includes("fetch")) {
-          errorMessage = "Network error - please check your connection and try again";
+          errorMessage =
+            "Network error - please check your connection and try again";
         } else if (err.message.includes("timeout")) {
           errorMessage = "Request timed out - please try again";
-        } else if (err.message.includes("permission") || err.message.includes("unauthorized")) {
+        } else if (
+          err.message.includes("permission") ||
+          err.message.includes("unauthorized")
+        ) {
           errorMessage = "You don't have permission to save these reports";
-        } else if (err.message.includes("database") || err.message.includes("Database")) {
-          errorMessage = "Database temporarily unavailable - please try again later";
+        } else if (
+          err.message.includes("database") ||
+          err.message.includes("Database")
+        ) {
+          errorMessage =
+            "Database temporarily unavailable - please try again later";
         }
       }
-      
+
       toast.error(errorMessage);
     } finally {
       setBulkOperationLoading(false);
@@ -1053,24 +1069,39 @@ export function ReportDataTable({
 
   return (
     <div
-      className={`flex w-full flex-col justify-start gap-2 ${className ?? ""}`}
+      className={`flex w-full flex-col justify-start gap-4 ${className ?? ""}`}
     >
       <div className="flex items-center justify-between px-4 lg:px-6">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">Analysis Reports 📖</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(isFullScreen ? "/" : "/table")}
+            className="h-8 w-8 p-0"
+            title={isFullScreen ? "Minimize table view" : "Maximize table view"}
+          >
+            {isFullScreen ? (
+              <IconMinimize className="h-4 w-4" />
+            ) : (
+              <IconMaximize className="h-4 w-4" />
+            )}
+          </Button>
         </div>
         <div className="flex items-center gap-2">
           {/* Bulk Actions Dropdown */}
           {(() => {
             const selectedRows = table.getFilteredSelectedRowModel().rows;
             const selectedCount = selectedRows.length;
-            const selectedReports = selectedRows.map(row => row.original);
-            const nonDoneReports = selectedReports.filter(report => report.status !== "done");
+            const selectedReports = selectedRows.map((row) => row.original);
+            const nonDoneReports = selectedReports.filter(
+              (report) => report.status !== "done",
+            );
             const hasNonDoneReports = nonDoneReports.length > 0;
-            
+
             const isDisabled = selectedCount === 0 || bulkOperationLoading;
             const isSaveDisabled = isDisabled || hasNonDoneReports;
-            
+
             return (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1078,7 +1109,7 @@ export function ReportDataTable({
                     variant="outline"
                     size="sm"
                     disabled={isDisabled}
-                    className={`${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`${isDisabled ? "cursor-not-allowed opacity-50" : ""}`}
                   >
                     {bulkOperationLoading ? (
                       <>
@@ -1087,7 +1118,7 @@ export function ReportDataTable({
                       </>
                     ) : (
                       <>
-                        Actions{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                        Actions{selectedCount > 0 ? ` (${selectedCount})` : ""}
                         <IconChevronDown className="ml-1 h-3 w-3" />
                       </>
                     )}
@@ -1097,12 +1128,12 @@ export function ReportDataTable({
                   <DropdownMenuItem
                     onClick={handleBulkSave}
                     disabled={isSaveDisabled}
-                    className={hasNonDoneReports ? 'opacity-50' : ''}
+                    className={hasNonDoneReports ? "opacity-50" : ""}
                   >
                     <IconBookmark className="mr-2 h-4 w-4" />
                     Save Selected
                     {hasNonDoneReports && (
-                      <span className="ml-1 text-xs text-muted-foreground">
+                      <span className="text-muted-foreground ml-1 text-xs">
                         (Only done)
                       </span>
                     )}
@@ -1165,12 +1196,8 @@ export function ReportDataTable({
               <SelectItem value="BUY">BUY</SelectItem>
               <SelectItem value="SELL">SELL</SelectItem>
               <SelectItem value="HOLD">HOLD</SelectItem>
-              <SelectItem value="BUY or HOLD">BUY or HOLD</SelectItem>
-              <SelectItem value="SELL or HOLD">SELL or HOLD</SelectItem>
             </SelectContent>
           </Select>
-
-
 
           <Button
             variant="outline"
@@ -1186,7 +1213,7 @@ export function ReportDataTable({
         </div>
       </div>
 
-      <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+      <div className="relative flex flex-col gap-4 overflow-auto px-4 pb-6 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
           <Table>
             <TableHeader className="bg-muted sticky top-0 z-10">
@@ -1213,7 +1240,9 @@ export function ReportDataTable({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    onClick={(event) => handleRowClick(row.original.sessionId, event)}
+                    onClick={(event) =>
+                      handleRowClick(row.original.sessionId, event)
+                    }
                     className="hover:bg-muted/50 cursor-pointer transition-colors"
                   >
                     {row.getVisibleCells().map((cell) => (
@@ -1324,7 +1353,10 @@ export function ReportDataTable({
       </div>
 
       {/* Confirmation Dialog */}
-      <Dialog open={confirmDialog.open} onOpenChange={confirmDialog.loading ? undefined : closeConfirmDialog}>
+      <Dialog
+        open={confirmDialog.open}
+        onOpenChange={confirmDialog.loading ? undefined : closeConfirmDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -1341,11 +1373,15 @@ export function ReportDataTable({
                 ? `Are you sure you want to permanently delete the analysis report for ${confirmDialog.ticker}? This action cannot be undone and will remove all associated data.`
                 : confirmDialog.type === "bulkDelete"
                   ? (() => {
-                      const selectedReports = confirmDialog.selectedReports || [];
+                      const selectedReports =
+                        confirmDialog.selectedReports || [];
                       const count = selectedReports.length;
-                      const tickers = selectedReports.map(r => r.ticker);
-                      const displayTickers = count <= 5 ? tickers.join(", ") : `${tickers.slice(0, 3).join(", ")} and ${count - 3} more`;
-                      return `Are you sure you want to permanently delete ${count} report${count === 1 ? '' : 's'}? (${displayTickers}) This action cannot be undone and will remove all associated data for these reports.`;
+                      const tickers = selectedReports.map((r) => r.ticker);
+                      const displayTickers =
+                        count <= 5
+                          ? tickers.join(", ")
+                          : `${tickers.slice(0, 3).join(", ")} and ${count - 3} more`;
+                      return `Are you sure you want to permanently delete ${count} report${count === 1 ? "" : "s"}? (${displayTickers}) This action cannot be undone and will remove all associated data for these reports.`;
                     })()
                   : confirmDialog.type === "publish"
                     ? `Are you sure you want to publish the analysis report for ${confirmDialog.ticker}? This will make the report visible to other users.`
@@ -1353,8 +1389,8 @@ export function ReportDataTable({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={closeConfirmDialog}
               disabled={confirmDialog.loading}
             >
@@ -1362,8 +1398,9 @@ export function ReportDataTable({
             </Button>
             <Button
               variant={
-                confirmDialog.type === "delete" || confirmDialog.type === "bulkDelete" 
-                  ? "destructive" 
+                confirmDialog.type === "delete" ||
+                confirmDialog.type === "bulkDelete"
+                  ? "destructive"
                   : "default"
               }
               onClick={handleConfirmAction}

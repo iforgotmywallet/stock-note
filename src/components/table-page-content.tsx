@@ -13,6 +13,7 @@ export default function TablePageContent({ userId }: TablePageContentProps) {
         userId={userId}
         className="w-full"
         showIdColumn={true}
+        isFullScreen={true}
       />
     </div>
   );

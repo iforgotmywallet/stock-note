@@ -555,8 +555,6 @@ export class AgentReportsService {
     if (!recommendation) return "HOLD";
 
     const rec = recommendation.toUpperCase();
-    if (rec.includes("BUY") && rec.includes("HOLD")) return "BUY or HOLD";
-    if (rec.includes("SELL") && rec.includes("HOLD")) return "SELL or HOLD";
     if (rec.includes("BUY")) return "BUY";
     if (rec.includes("SELL")) return "SELL";
     return "HOLD";

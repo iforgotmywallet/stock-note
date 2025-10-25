@@ -70,7 +70,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [animatingItems, setAnimatingItems] = useState<Set<string>>(new Set());
+
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [currentLimit, setCurrentLimit] = useState(maxItems);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -168,49 +168,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
     fetchReports();
   }, [userId, currentLimit, isLoadingMore]);
 
-  // Handle document click with smooth animation
-  const handleDocumentClick = useCallback(async (clickedItem: ReportItem) => {
-    // Add animation class
-    setAnimatingItems((prev) => new Set(prev).add(clickedItem.sessionId));
 
-    // Move clicked item to top
-    setReports((prevReports) => {
-      const otherReports = prevReports.filter(
-        (report) => report.sessionId !== clickedItem.sessionId,
-      );
-      return [clickedItem, ...otherReports];
-    });
-
-    // Update server-side ordering
-    try {
-      await fetch("/api/reports/sidebar", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ sessionId: clickedItem.sessionId }),
-      });
-    } catch (error) {
-      console.error("Failed to update report access:", error);
-      // Revert update on error
-      setReports((prevReports) => {
-        const withoutClicked = prevReports.filter(
-          (report) => report.sessionId !== clickedItem.sessionId,
-        );
-        // Find original position and insert back
-        return [...withoutClicked, clickedItem];
-      });
-    }
-
-    // Remove animation class after animation completes
-    setTimeout(() => {
-      setAnimatingItems((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(clickedItem.sessionId);
-        return newSet;
-      });
-    }, 500); // Match CSS animation duration
-  }, []);
 
   // Check if a document is currently selected
   const isDocumentSelected = useCallback(
@@ -310,7 +268,6 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
   const refreshDocuments = useCallback(async () => {
     if (isRefreshing || isLoading) return;
 
-    console.log("Refreshing nav-documents...");
     setIsRefreshing(true);
     try {
       // Reset to initial state and refetch
@@ -349,26 +306,7 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
     }
   }, [isRefreshing, isLoading, maxItems]);
 
-  // Listen for sidebar refresh events only when opening documents
-  useEffect(() => {
-    const handleSidebarRefresh = (event: CustomEvent) => {
-      // Only refresh when opening a document, not for other actions
-      if (event.detail?.action === "documentOpen") {
-        console.log("Refreshing sidebar due to document open");
-        if (!isRefreshing && !isLoading) {
-          setTimeout(() => {
-            refreshDocuments();
-          }, 200);
-        }
-      }
-    };
 
-    window.addEventListener('sidebarRefresh', handleSidebarRefresh as EventListener);
-    
-    return () => {
-      window.removeEventListener('sidebarRefresh', handleSidebarRefresh as EventListener);
-    };
-  }, [isRefreshing, isLoading, refreshDocuments]);
 
   // Loading skeleton
   const renderLoadingSkeleton = () => (
@@ -413,27 +351,19 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
     <SidebarMenu className="space-y-1">
       {reports.map((item, index) => {
         const isSelected = isDocumentSelected(item);
-        const isAnimating = animatingItems.has(item.sessionId);
         const isNewlyLoaded = newlyLoadedItems.has(item.sessionId);
 
         return (
           <SidebarMenuItem
             key={item.sessionId}
-            className={`transform-gpu transition-all duration-500 ease-out ${isAnimating ? "z-10" : "z-0"} hover:scale-[1.02] hover:shadow-sm ${isSelected ? "bg-accent/20 border-primary border-l-2" : ""} ${isNewlyLoaded ? "animate-in slide-in-from-bottom-2 fade-in-0" : ""} `}
+            className={`hover:scale-[1.02] hover:shadow-sm ${isSelected ? "bg-accent/20 border-primary border-l-2" : ""} ${isNewlyLoaded ? "animate-in slide-in-from-bottom-2 fade-in-0" : ""} `}
             style={{
-              transform:
-                isAnimating && index === 0
-                  ? "translateY(-4px) scale(1.02)"
-                  : "translateY(0) scale(1)",
               transition: isNewlyLoaded
                 ? "all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)"
                 : "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-              boxShadow:
-                isAnimating && index === 0
-                  ? "0 4px 12px rgba(0, 0, 0, 0.1)"
-                  : isSelected
-                    ? "0 2px 8px rgba(0, 0, 0, 0.05)"
-                    : "none",
+              boxShadow: isSelected
+                ? "0 2px 8px rgba(0, 0, 0, 0.05)"
+                : "none",
               animationDelay: isNewlyLoaded
                 ? `${(index - (reports.length - newlyLoadedItems.size)) * 100}ms`
                 : "0ms",
@@ -442,15 +372,14 @@ export function NavDocuments({ userId, maxItems = 10 }: NavDocumentsProps) {
             <SidebarMenuButton asChild>
               <Link
                 href={item.url}
-                onClick={() => handleDocumentClick(item)}
-                className={`hover:bg-accent/60 active:bg-accent/80 transition-all duration-300 ease-out hover:shadow-sm active:scale-95 ${isAnimating ? "bg-accent/40" : ""} ${isSelected ? "bg-accent/30 font-medium" : ""} `}
+                className={`hover:bg-accent/60 active:bg-accent/80 transition-all duration-300 ease-out hover:shadow-sm active:scale-95 ${isSelected ? "bg-accent/30 font-medium" : ""} `}
               >
                 <item.icon
-                  className={`transition-all duration-300 ease-out ${isAnimating ? "text-primary scale-110" : "scale-100"} ${isSelected ? "text-primary scale-105" : ""} hover:scale-105`}
+                  className={`transition-all duration-300 ease-out ${isSelected ? "text-primary scale-105" : ""} hover:scale-105`}
                 />
                 <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                   <span
-                    className={`truncate text-xs font-light transition-all duration-300 ease-out ${isAnimating ? "text-primary font-normal" : ""} ${isSelected ? "text-primary font-medium" : ""} `}
+                    className={`truncate text-xs font-light transition-all duration-300 ease-out ${isSelected ? "text-primary font-medium" : ""} `}
                   >
                     {item.name}
                   </span>

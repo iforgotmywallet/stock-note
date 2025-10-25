@@ -14,7 +14,6 @@ import {
 } from "@tabler/icons-react";
 
 import { Button } from "~/components/ui/button";
-import { ButtonGroup } from "~/components/ui/button-group";
 import { Badge } from "~/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "~/components/ui/tabs";
 import {
@@ -187,7 +186,7 @@ export function StockAnalysisDashboard({
                 <TabsTrigger
                   key={tab.id}
                   value={tab.id}
-                  className="flex items-center gap-1.5 p-2 sm:p-3"
+                  className="text-foreground data-[state=active]:text-foreground flex items-center gap-1.5 p-2 sm:p-3"
                 >
                   <IconComponent className="size-4" />
                   <span className="hidden text-xs sm:inline sm:text-sm">
@@ -474,44 +473,33 @@ export function StockAnalysisDashboard({
                       Bull vs Bear analysis and expert judgment
                     </p>
                   </div>
-                  <ButtonGroup>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDebateView("bull")}
-                      className={`h-8 px-3 ${
-                        debateView === "bull"
-                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
-                          : "hover:bg-muted"
-                      }`}
-                    >
-                      🐂 Bull
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDebateView("bear")}
-                      className={`h-8 px-3 ${
-                        debateView === "bear"
-                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
-                          : "hover:bg-muted"
-                      }`}
-                    >
-                      🐻 Bear
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDebateView("judge")}
-                      className={`h-8 px-3 ${
-                        debateView === "judge"
-                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
-                          : "hover:bg-muted"
-                      }`}
-                    >
-                      ⚖️ Judge
-                    </Button>
-                  </ButtonGroup>
+                  <Tabs
+                    value={debateView}
+                    onValueChange={(value) =>
+                      setDebateView(value as "bull" | "bear" | "judge")
+                    }
+                  >
+                    <TabsList className="grid h-auto w-fit grid-cols-3">
+                      <TabsTrigger
+                        value="bull"
+                        className="text-foreground data-[state=active]:text-foreground flex items-center gap-1.5 px-3 py-2 text-sm"
+                      >
+                        🐂 Bull
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="bear"
+                        className="text-foreground data-[state=active]:text-foreground flex items-center gap-1.5 px-3 py-2 text-sm"
+                      >
+                        🐻 Bear
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="judge"
+                        className="text-foreground data-[state=active]:text-foreground flex items-center gap-1.5 px-3 py-2 text-sm"
+                      >
+                        ⚖️ Judge
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </div>
               </div>
 
@@ -616,56 +604,41 @@ export function StockAnalysisDashboard({
                       Multi-perspective risk analysis and recommendations
                     </p>
                   </div>
-                  <ButtonGroup>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setRiskView("risky")}
-                      className={`h-8 px-3 ${
-                        riskView === "risky"
-                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
-                          : "hover:bg-muted"
-                      }`}
-                    >
-                      🔥 High Risk
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setRiskView("safe")}
-                      className={`h-8 px-3 ${
-                        riskView === "safe"
-                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
-                          : "hover:bg-muted"
-                      }`}
-                    >
-                      🛡️ Conservative
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setRiskView("neutral")}
-                      className={`h-8 px-3 ${
-                        riskView === "neutral"
-                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
-                          : "hover:bg-muted"
-                      }`}
-                    >
-                      ⚖️ Balanced
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setRiskView("judge")}
-                      className={`h-8 px-3 ${
-                        riskView === "judge"
-                          ? "bg-blue-100 text-blue-900 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800"
-                          : "hover:bg-muted"
-                      }`}
-                    >
-                      📊 Decision
-                    </Button>
-                  </ButtonGroup>
+                  <Tabs
+                    value={riskView}
+                    onValueChange={(value) =>
+                      setRiskView(
+                        value as "risky" | "safe" | "neutral" | "judge",
+                      )
+                    }
+                  >
+                    <TabsList className="grid h-auto w-fit grid-cols-4">
+                      <TabsTrigger
+                        value="risky"
+                        className="text-foreground data-[state=active]:text-foreground flex items-center gap-1.5 px-3 py-2 text-sm"
+                      >
+                        🔥 High Risk
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="safe"
+                        className="text-foreground data-[state=active]:text-foreground flex items-center gap-1.5 px-3 py-2 text-sm"
+                      >
+                        🛡️ Conservative
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="neutral"
+                        className="text-foreground data-[state=active]:text-foreground flex items-center gap-1.5 px-3 py-2 text-sm"
+                      >
+                        ⚖️ Balanced
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="judge"
+                        className="text-foreground data-[state=active]:text-foreground flex items-center gap-1.5 px-3 py-2 text-sm"
+                      >
+                        📊 Decision
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </div>
               </div>
 

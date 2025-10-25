@@ -20,6 +20,6 @@ export interface StockData {
     };
     trader_plan: string;
     final_recommendation: string;
-    recommendation_type: 'BUY' | 'SELL' | 'HOLD' | 'BUY or HOLD' | 'SELL or HOLD';
+    recommendation_type: "BUY" | "SELL" | "HOLD";
   };
 }
