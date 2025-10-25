@@ -98,7 +98,7 @@ export const generateAnalysis = inngest.createFunction(
           try {
             await db.agent_reports.update({
               where: { session_id: sessionId },
-              data: { status: "failed", updated_at: new Date() },
+              data: { status: "NEC", updated_at: new Date() },
             });
           } catch (updateError) {
             console.error(

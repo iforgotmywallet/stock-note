@@ -128,7 +128,7 @@ const statusConfig = {
     iconClassName: "",
   },
   NEC: {
-    label: "Not Enough Coverage",
+    label: "Not Enough Credit",
     variant: "outline" as const,
     icon: IconAlertTriangle,
     iconClassName: "",
@@ -356,11 +356,16 @@ const createColumns = (
           className="text-muted-foreground text-sm whitespace-nowrap hover:underline"
         >
           <div className="pl-4">
-            {row.original.analysisDate.toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {(() => {
+              // Create a new date treating the database date as local time to avoid timezone shift
+              const date = new Date(row.original.analysisDate);
+              const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+              return localDate.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              });
+            })()}
           </div>
         </Link>
       ),
@@ -454,15 +459,17 @@ const createColumns = (
             <Link
               href={`/document/${row.original.sessionId}`}
             >
-              <Badge
-                variant="outline"
-                className="border-border bg-background text-foreground hover:bg-muted flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs whitespace-nowrap"
-              >
-                <span className="text-sm">
-                  {getRecommendationEmoji(recommendation)}
-                </span>
-                <span>{recommendation}</span>
-              </Badge>
+              <div className="pl-4">
+                <Badge
+                  variant="outline"
+                  className="border-border bg-background text-foreground hover:bg-muted flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs whitespace-nowrap"
+                >
+                  <span className="text-sm">
+                    {getRecommendationEmoji(recommendation)}
+                  </span>
+                  <span>{recommendation}</span>
+                </Badge>
+              </div>
             </Link>
           );
         }
@@ -1172,7 +1179,7 @@ export function ReportDataTable({
               <SelectItem value="processing">In Process</SelectItem>
               <SelectItem value="done">Done</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="NEC">Not Enough Coverage</SelectItem>
+              <SelectItem value="NEC">Not Enough Credit</SelectItem>
             </SelectContent>
           </Select>
 

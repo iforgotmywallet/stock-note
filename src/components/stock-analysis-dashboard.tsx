@@ -23,21 +23,35 @@ import {
   CardDescription,
   CardContent,
 } from "~/components/ui/card";
+import { Skeleton } from "~/components/ui/skeleton";
 import { MarkdownRenderer } from "~/components/markdown-renderer";
 import { extractLocalTimeFromSessionId } from "~/lib/utils";
 import type { StockData } from "~/types/stock-data";
+
+type ReportStatus = "queued" | "processing" | "done" | "failed" | "NEC";
 
 interface StockAnalysisDashboardProps {
   reportData?: StockData;
   sessionId?: string;
   className?: string;
+  status?: ReportStatus;
+  ticker?: string;
 }
 
 export function StockAnalysisDashboard({
   reportData,
   sessionId,
   className,
+  status,
+  ticker,
 }: StockAnalysisDashboardProps) {
+  // Status checks
+  const isProcessing = status === "processing" || status === "queued";
+  const isFailed = status === "failed" || status === "NEC";
+  const isNEC = status === "NEC";
+  const isFailedOnly = status === "failed";
+  const isQueued = status === "queued";
+
   const [activeTab, setActiveTab] = React.useState("overview");
   const [stockData, setStockData] = React.useState<StockData | null>(null);
   const [debateView, setDebateView] = React.useState<"bull" | "bear" | "judge">(
@@ -52,8 +66,8 @@ export function StockAnalysisDashboard({
     if (reportData) {
       // Use provided report data
       setStockData(reportData);
-    } else {
-      // Fall back to static JSON for backward compatibility
+    } else if (!isProcessing && !isFailed) {
+      // Only fall back to static JSON if not in processing/queued or failed state
       const loadStockData = async () => {
         try {
           const response = await fetch("/pypl-dashboard-data.json");
@@ -65,15 +79,14 @@ export function StockAnalysisDashboard({
       };
       void loadStockData();
     }
-  }, [reportData]);
+  }, [reportData, isProcessing, isFailed]);
 
   // Extract data from the loaded stock data
   const extractedData = React.useMemo(() => {
     if (!stockData) return null;
 
     // Extract price info from market report
-    const priceRegex =
-      /\*\*(?:Current Price|Current Close)(?:\s*\([^)]+\))?\*\*:\s*\$(\d+\.\d+)/;
+    const priceRegex = /\*\*Current Price\*\*.*?(\d+\.\d+)/;
     const priceMatch = priceRegex.exec(stockData.analysis.market_report);
 
     return {
@@ -91,6 +104,125 @@ export function StockAnalysisDashboard({
     { id: "risk", label: "Risk", icon: IconAlertTriangle },
     { id: "plan", label: "Plan", icon: IconTarget },
   ];
+
+  // Show skeleton loading state when status is processing or queued (prioritize status over stockData)
+  if (isProcessing) {
+    return (
+      <div className={`bg-background min-h-screen ${className}`}>
+        <div className="container mx-auto max-w-7xl">
+          {/* Header Skeleton */}
+          <div className="mb-8 flex flex-col items-start justify-between sm:flex-row sm:items-center sm:px-6">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-5 w-5 rounded-full" />
+                {sessionId && <Skeleton className="h-6 w-16" />}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">At</span>
+                <Skeleton className="h-6 w-32" />
+                <span className="text-muted-foreground">, the price is</span>
+                <Skeleton className="h-6 w-16" />
+              </div>
+            </div>
+            <Skeleton className="h-8 w-20" />
+          </div>
+
+          {/* Tab Navigation Skeleton */}
+          <div className="w-full px-4 pb-4 sm:px-6">
+            <div className="mb-6 grid h-auto w-full grid-cols-4 gap-2 lg:grid-cols-8">
+              {tabs.map((tab) => (
+                <Skeleton key={tab.id} className="h-12 w-full" />
+              ))}
+            </div>
+
+            {/* Tab Content Skeleton */}
+            <div className="mt-6 px-4 sm:px-6">
+              <div className="space-y-4 sm:space-y-6">
+                <div className="mb-6">
+                  <Skeleton className="mb-2 h-7 w-48" />
+                  <Skeleton className="h-5 w-96" />
+                </div>
+
+                {/* Card Skeleton */}
+                <div className="bg-card text-card-foreground rounded-lg border shadow-sm">
+                  <div className="flex flex-col space-y-1.5 p-6">
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-4 w-64" />
+                  </div>
+                  <div className="p-6 pt-0">
+                    <div className="space-y-3">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                      <div className="mt-4 space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-2/3" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state for failed statuses
+  if (isFailed) {
+    return (
+      <div className={`bg-background min-h-screen ${className}`}>
+        <div className="container mx-auto max-w-7xl">
+          {/* Header Section for Failed State */}
+          <div className="mb-8 flex flex-col items-start justify-between sm:flex-row sm:items-center sm:px-6">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold tracking-tight">
+                  {ticker ?? "UNKNOWN"}
+                </h1>
+                <IconRosetteDiscountCheckFilled
+                  className="h-5 w-5 text-gray-400 drop-shadow-sm"
+                  title="Report Status"
+                />
+                {sessionId && (
+                  <Badge variant="secondary" className="font-mono">
+                    #
+                    {sessionId.split("_").pop()?.slice(-8) ??
+                      sessionId.slice(-8)}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-muted-foreground">
+                Analysis could not be completed
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="bg-red-600 text-white hover:bg-red-700 hover:opacity-90"
+            >
+              {isNEC ? "Not Enough Credit" : "Failed"}
+            </Button>
+          </div>
+
+          {/* Empty State Content */}
+          <div className="flex min-h-[60vh] items-center justify-center px-4 sm:px-6">
+            <div className="space-y-4 text-center">
+              <IconAlertTriangle className="text-muted-foreground mx-auto h-16 w-16" />
+              <h2 className="text-2xl font-semibold">Analysis Unavailable</h2>
+              <p className="text-muted-foreground max-w-md">
+                {isNEC
+                  ? "This analysis could not be completed due to insufficient credit."
+                  : "The analysis failed to complete. Please try generating a new report."}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading state when no data is available
   if (!stockData) {
@@ -162,14 +294,27 @@ export function StockAnalysisDashboard({
           <Button
             size="sm"
             className={`text-white hover:opacity-90 ${
-              stockData?.analysis?.recommendation_type === "BUY"
-                ? "bg-green-600 hover:bg-green-700"
-                : stockData?.analysis?.recommendation_type === "SELL"
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-yellow-600 hover:bg-yellow-700"
+              // Show status for failed states, otherwise show recommendation
+              isFailed
+                ? "bg-red-600 hover:bg-red-700"
+                : isProcessing
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : stockData?.analysis?.recommendation_type === "BUY"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : stockData?.analysis?.recommendation_type === "SELL"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-yellow-600 hover:bg-yellow-700"
             }`}
           >
-            {stockData?.analysis?.recommendation_type || "LOADING"}
+            {isFailedOnly
+              ? "FAILED"
+              : isNEC
+                ? "NEC"
+                : isQueued
+                  ? "QUEUED"
+                  : isProcessing
+                    ? "PROCESSING"
+                    : stockData?.analysis?.recommendation_type || "LOADING"}
           </Button>
         </div>
 
@@ -216,14 +361,28 @@ export function StockAnalysisDashboard({
                     Final Recommendation
                     <span
                       className={`rounded px-2 py-1 text-sm font-medium ${
-                        stockData?.analysis?.recommendation_type === "BUY"
-                          ? "bg-green-100 text-green-800"
-                          : stockData?.analysis?.recommendation_type === "SELL"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-yellow-100 text-yellow-800"
+                        isFailed
+                          ? "bg-red-100 text-red-800"
+                          : isProcessing
+                            ? "bg-blue-100 text-blue-800"
+                            : stockData?.analysis?.recommendation_type === "BUY"
+                              ? "bg-green-100 text-green-800"
+                              : stockData?.analysis?.recommendation_type ===
+                                  "SELL"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-yellow-100 text-yellow-800"
                       }`}
                     >
-                      {stockData?.analysis?.recommendation_type ?? "LOADING"}
+                      {isFailedOnly
+                        ? "FAILED"
+                        : isNEC
+                          ? "NEC"
+                          : isQueued
+                            ? "QUEUED"
+                            : isProcessing
+                              ? "PROCESSING"
+                              : (stockData?.analysis?.recommendation_type ??
+                                "LOADING")}
                     </span>
                   </CardTitle>
                   <CardDescription>
@@ -234,17 +393,64 @@ export function StockAnalysisDashboard({
                 <CardContent>
                   <div className="space-y-3">
                     <p className="text-sm">
-                      Current analysis indicates a{" "}
-                      <strong>
-                        {stockData?.analysis?.recommendation_type ?? "LOADING"}
-                      </strong>{" "}
-                      recommendation for {stockData?.ticker ?? "this stock"}
-                      based on comprehensive multi-factor analysis including
-                      technical indicators, fundamental metrics, and market
-                      sentiment evaluation.
+                      {isFailed ? (
+                        <>
+                          Analysis for{" "}
+                          {stockData?.ticker ?? ticker ?? "this stock"} could
+                          not be completed.{" "}
+                          {isNEC
+                            ? "Insufficient data or market conditions prevented analysis completion."
+                            : "The analysis process encountered an error and failed to complete."}
+                        </>
+                      ) : isProcessing ? (
+                        <>
+                          Analysis for{" "}
+                          {stockData?.ticker ?? ticker ?? "this stock"} is
+                          currently{" "}
+                          <strong>
+                            {isQueued ? "QUEUED" : "IN PROGRESS"}
+                          </strong>
+                          . {isQueued 
+                            ? "The analysis has been queued and will begin processing shortly."
+                            : "The system is performing comprehensive multi-factor analysis including technical indicators, fundamental metrics, and market sentiment evaluation."
+                          }
+                        </>
+                      ) : (
+                        <>
+                          Current analysis indicates a{" "}
+                          <strong>
+                            {stockData?.analysis?.recommendation_type ??
+                              "LOADING"}
+                          </strong>{" "}
+                          recommendation for {stockData?.ticker ?? "this stock"}
+                          based on comprehensive multi-factor analysis including
+                          technical indicators, fundamental metrics, and market
+                          sentiment evaluation.
+                        </>
+                      )}
                     </p>
                     {/* Display final recommendation from data */}
-                    {stockData?.analysis?.final_recommendation ? (
+                    {isFailed ? (
+                      <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+                        <p className="text-sm text-red-800 dark:text-red-400">
+                          {isNEC
+                            ? "Analysis could not be completed due to insufficient market data or adverse conditions."
+                            : "The analysis process failed to complete successfully. Please try generating a new report."}
+                        </p>
+                      </div>
+                    ) : isProcessing ? (
+                      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                        <div className="flex items-center gap-3">
+                          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
+                          <p className="text-sm text-blue-800 dark:text-blue-400">
+                            {isQueued 
+                              ? "Analysis has been queued and will begin processing shortly."
+                              : "Analysis is currently in progress. This may take several minutes to complete."
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    ) : stockData?.analysis?.final_recommendation ? (
                       <div className="mt-4">
                         <MarkdownRenderer
                           content={stockData.analysis.final_recommendation}

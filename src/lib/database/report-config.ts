@@ -35,7 +35,7 @@ export const statusConfig: Record<string, StatusConfig> = {
     color: 'red',
   },
   NEC: {
-    label: 'Not Enough Coverage',
+    label: 'Not Enough Credit',
     variant: 'outline',
     color: 'gray',
   },

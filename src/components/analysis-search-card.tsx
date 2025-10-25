@@ -296,7 +296,7 @@ const AnalysisSearchCardContent = ({
                   !formData.ticker ||
                   formData.analysts.length === 0
                 }
-                className="w-full"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 w-full"
               >
                 {isAnalyzing ? (
                   <>

@@ -32,21 +32,38 @@ export default async function ReportDashboardPage({ params }: PageProps) {
   }
 
   try {
-    // Verify user ownership and fetch report data
-    const reportData = await AgentReportsService.getReportBySessionId(
+    // First check report access and get status
+    const reportAccess = await AgentReportsService.checkReportAccess(
       sessionId,
       session.user.id
     );
 
-    // If report not found, user doesn't own it, or it's not published, show access denied
-    if (!reportData) {
+    // If report doesn't exist or user doesn't own it, show access denied
+    if (!reportAccess.exists || !reportAccess.owned) {
       return <DocumentAccessDenied />;
     }
 
-    // Render the dashboard with the report data
+    // Get the report status and basic info
+    const reportInfo = await AgentReportsService.getReportInfo(sessionId);
+    
+    // If report is published, get the full data
+    let reportData = null;
+    if (reportAccess.published) {
+      reportData = await AgentReportsService.getReportBySessionId(
+        sessionId,
+        session.user.id
+      );
+    }
+
+    // Render the dashboard with the report data and status
     return (
       <div className="container mx-auto p-6">
-        <StockAnalysisDashboard reportData={reportData} sessionId={sessionId} />
+        <StockAnalysisDashboard 
+          reportData={reportData} 
+          sessionId={sessionId}
+          status={reportInfo?.status}
+          ticker={reportInfo?.ticker}
+        />
       </div>
     );
   } catch (error) {
