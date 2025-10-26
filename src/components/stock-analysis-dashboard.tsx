@@ -118,7 +118,9 @@ export function StockAnalysisDashboard({
       fetchProgress();
 
       // Set up polling for progress updates every 10 seconds
-      const interval = setInterval(fetchProgress, 10000);
+      const interval = setInterval(() => {
+        void fetchProgress();
+      }, 10000);
 
       return () => clearInterval(interval);
     }

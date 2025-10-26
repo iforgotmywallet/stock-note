@@ -59,9 +59,9 @@ export default async function ReportDashboardPage({ params }: PageProps) {
     return (
       <div className="container mx-auto p-6">
         <StockAnalysisDashboard 
-          reportData={reportData} 
+          reportData={reportData ?? undefined} 
           sessionId={sessionId}
-          status={reportInfo?.status}
+          status={reportInfo?.status as "queued" | "processing" | "done" | "failed" | "NEC" | undefined}
           ticker={reportInfo?.ticker}
           reportId={reportInfo?.reportId}
         />
