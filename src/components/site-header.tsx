@@ -6,10 +6,13 @@ import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { SidebarTrigger } from "~/components/ui/sidebar";
 import { ClientThemeToggle } from "~/components/client-theme-toggle";
+import { CreditDisplay } from "~/components/credit-display";
+import { authClient } from "~/lib/auth-client";
 
 export function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
+  const { data: session } = authClient.useSession();
 
   // Check if we're on the root page
   const isRootPage = pathname === "/";
@@ -33,6 +36,7 @@ export function SiteHeader() {
           </Button>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <CreditDisplay userId={session?.user?.id ?? null} />
           <ClientThemeToggle />
         </div>
       </div>

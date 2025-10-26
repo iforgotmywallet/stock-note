@@ -39,22 +39,28 @@ export function NavUser({
   const { isMobile } = useSidebar();
   const router = useRouter();
 
-  const handleLogout = async () => {
-    try {
-      await authClient.signOut({
-        fetchOptions: {
-          onSuccess: () => {
-            router.push("/auth/sign-in");
+  const handleLogout = () => {
+    void (async () => {
+      try {
+        await authClient.signOut({
+          fetchOptions: {
+            onSuccess: () => {
+              router.push("/auth/sign-in");
+            },
           },
-        },
-      });
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+        });
+      } catch (error) {
+        console.error("Logout failed:", error);
+      }
+    })();
   };
 
   const handleAccountClick = () => {
     router.push("/account");
+  };
+
+  const handleBillingClick = () => {
+    router.push("/customer-portal");
   };
 
   return (
@@ -105,7 +111,7 @@ export function NavUser({
                 <IconUserCircle />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={handleBillingClick}>
                 <IconCreditCard />
                 Billing
               </DropdownMenuItem>

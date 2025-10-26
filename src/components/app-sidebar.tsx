@@ -7,7 +7,7 @@ import {
   IconFileAi,
   IconFileDescription,
   IconHelp,
-  IconSettings,
+  IconCreditCard,
   IconStackMiddle,
   IconAlertCircle,
   IconTable,
@@ -135,9 +135,9 @@ const data = {
   ],
   navSecondary: [
     {
-      title: "Settings",
-      url: "#",
-      icon: IconSettings,
+      title: "Billing",
+      url: "/customer-portal",
+      icon: IconCreditCard,
     },
     {
       title: "Get Help",
