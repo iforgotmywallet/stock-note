@@ -18,7 +18,7 @@ export class ProgressCalculationService {
    * Based on requirements 3.4: market_analyst_report, news_analyst_report, fundamentals_analyst_report,
    * social_analyst_report, bull_researcher_report, bear_researcher_report, research_manager_report,
    * trader_report, risky_analyst_report, neutral_analyst_report, safe_analyst_report,
-   * portfolio_manager_report, final_analysis
+   * portfolio_manager_report, final_analysis, recommendation
    */
   private static readonly TRACKABLE_COLUMNS = [
     "market_analyst_report",
@@ -34,6 +34,7 @@ export class ProgressCalculationService {
     "safe_analyst_report",
     "portfolio_manager_report",
     "final_analysis",
+    "recommendation",
   ] as const;
 
   /**
@@ -43,9 +44,9 @@ export class ProgressCalculationService {
    */
   static calculateProgress(report: agent_reports): ProgressData {
     try {
-      // Special case: If recommendation is filled and status is "done", progress is 100%
-      // Based on requirement 3.3
-      if (report.recommendation && report.status === "done") {
+      // Special case: If status is "done", ensure progress is 100%
+      // This handles edge cases where all columns are populated but calculation might be slightly off
+      if (report.status === "done") {
         return {
           percentage: 100,
           populatedColumns: [...this.TRACKABLE_COLUMNS],

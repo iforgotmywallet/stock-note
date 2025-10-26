@@ -353,25 +353,26 @@ export class AgentReportsService {
   }
 
   /**
-   * Get basic report information including status and ticker
+   * Get basic report information including status, ticker, and reportId
    * @param sessionId - Session ID of the report
-   * @returns Promise<{ status: string; ticker: string } | null> - Basic report info or null if not found
+   * @returns Promise<{ status: string; ticker: string; reportId: string } | null> - Basic report info or null if not found
    */
   static async getReportInfo(
     sessionId: string,
-  ): Promise<{ status: string; ticker: string } | null> {
+  ): Promise<{ status: string; ticker: string; reportId: string } | null> {
     try {
       const report = await db.agent_reports.findFirst({
         where: {
           session_id: sessionId,
         },
         select: {
+          id: true,
           status: true,
           ticker: true,
         },
       });
 
-      return report ? { status: report.status, ticker: report.ticker } : null;
+      return report ? { status: report.status, ticker: report.ticker, reportId: report.id } : null;
     } catch (error) {
       console.error("Error getting report info:", error);
       return null;

@@ -24,9 +24,12 @@ import {
   CardContent,
 } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
+import { Progress } from "~/components/ui/progress";
+import { Spinner } from "~/components/ui/spinner";
 import { MarkdownRenderer } from "~/components/markdown-renderer";
 import { extractLocalTimeFromSessionId } from "~/lib/utils";
 import type { StockData } from "~/types/stock-data";
+import type { ProgressData } from "~/components/progress-popover";
 
 type ReportStatus = "queued" | "processing" | "done" | "failed" | "NEC";
 
@@ -36,6 +39,7 @@ interface StockAnalysisDashboardProps {
   className?: string;
   status?: ReportStatus;
   ticker?: string;
+  reportId?: string;
 }
 
 export function StockAnalysisDashboard({
@@ -44,13 +48,14 @@ export function StockAnalysisDashboard({
   className,
   status,
   ticker,
+  reportId,
 }: StockAnalysisDashboardProps) {
   // Status checks
   const isProcessing = status === "processing" || status === "queued";
   const isFailed = status === "failed" || status === "NEC";
   const isNEC = status === "NEC";
-  const isFailedOnly = status === "failed";
   const isQueued = status === "queued";
+  const isFailed_Only = status === "failed";
 
   const [activeTab, setActiveTab] = React.useState("overview");
   const [stockData, setStockData] = React.useState<StockData | null>(null);
@@ -60,38 +65,72 @@ export function StockAnalysisDashboard({
   const [riskView, setRiskView] = React.useState<
     "risky" | "safe" | "neutral" | "judge"
   >("risky");
+  const [progressData, setProgressData] = React.useState<ProgressData | null>(
+    null,
+  );
+  const [isLoadingProgress, setIsLoadingProgress] = React.useState(false);
 
   // Load stock analysis data
   React.useEffect(() => {
     if (reportData) {
-      // Use provided report data
       setStockData(reportData);
     } else if (!isProcessing && !isFailed) {
-      // Only fall back to static JSON if not in processing/queued or failed state
+      // Fallback to demo data for development
       const loadStockData = async () => {
         try {
           const response = await fetch("/pypl-dashboard-data.json");
           const data = (await response.json()) as { data: StockData };
           setStockData(data.data);
         } catch (error) {
-          console.error("Failed to load stock analysis data:", error);
+          console.error("Failed to load demo data:", error);
         }
       };
       void loadStockData();
     }
   }, [reportData, isProcessing, isFailed]);
 
-  // Extract data from the loaded stock data
+  // Refresh to view complete report
+  const handleRefreshReport = React.useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  // Fetch progress data when processing
+  React.useEffect(() => {
+    if (isProcessing && reportId && status === "processing") {
+      const fetchProgress = async () => {
+        setIsLoadingProgress(true);
+        try {
+          const response = await fetch(`/api/reports/${reportId}/progress`);
+          if (response.ok) {
+            const apiResponse = await response.json();
+            const data = apiResponse.data || apiResponse;
+            if (data && data.percentage !== undefined) {
+              setProgressData(data);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch progress:", error);
+        } finally {
+          setIsLoadingProgress(false);
+        }
+      };
+
+      fetchProgress();
+
+      // Set up polling for progress updates every 10 seconds
+      const interval = setInterval(fetchProgress, 10000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isProcessing, reportId, status]);
+
+  // Extract price from market report
   const extractedData = React.useMemo(() => {
-    if (!stockData) return null;
-
-    // Extract price info from market report
-    const priceRegex = /\*\*Current Price\*\*.*?(\d+\.\d+)/;
-    const priceMatch = priceRegex.exec(stockData.analysis.market_report);
-
-    return {
-      currentPrice: priceMatch ? `${priceMatch[1]}` : "N/A",
-    };
+    if (!stockData?.analysis?.market_report) return null;
+    const priceMatch = /\*\*Current Price\*\*.*?(\d+\.\d+)/.exec(
+      stockData.analysis.market_report,
+    );
+    return { currentPrice: priceMatch ? priceMatch[1] : "N/A" };
   }, [stockData]);
 
   const tabs = [
@@ -105,7 +144,7 @@ export function StockAnalysisDashboard({
     { id: "plan", label: "Plan", icon: IconTarget },
   ];
 
-  // Show skeleton loading state when status is processing or queued (prioritize status over stockData)
+  // Show skeleton when processing/queued
   if (isProcessing) {
     return (
       <div className={`bg-background min-h-screen ${className}`}>
@@ -165,13 +204,107 @@ export function StockAnalysisDashboard({
                 </div>
               </div>
             </div>
+
+            {/* Progress Bar for Processing State */}
+            {status === "processing" && (
+              <div className="mt-8 px-4 sm:px-6">
+                <div className="bg-card text-card-foreground rounded-lg border p-6 shadow-sm">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="leading-none font-medium">
+                          Analysis Progress
+                        </h4>
+                        <p className="text-muted-foreground text-sm">
+                          Progress for {ticker || "this stock"}
+                        </p>
+                      </div>
+                      {isLoadingProgress && <Spinner className="size-4" />}
+                    </div>
+
+                    {progressData &&
+                    progressData.percentage !== undefined &&
+                    progressData.populatedColumns &&
+                    progressData.totalColumns !== undefined ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            {Math.round(progressData.percentage)}%
+                            {progressData.percentage >= 100 && (
+                              <span className="ml-2 text-xs text-green-600">
+                                - Analysis Complete!
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            {progressData.populatedColumns.length} of{" "}
+                            {progressData.totalColumns} steps complete
+                          </span>
+                        </div>
+                        <Progress
+                          value={progressData.percentage}
+                          className="h-2"
+                        />
+                        <div className="flex items-center justify-between">
+                          <div className="text-muted-foreground text-xs">
+                            Last updated:{" "}
+                            {new Date(
+                              progressData.lastUpdated,
+                            ).toLocaleTimeString("en-US", {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
+                          </div>
+                          {progressData.percentage >= 100 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleRefreshReport}
+                              className="h-7 px-3 text-xs"
+                            >
+                              View Report
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ) : isLoadingProgress ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="flex flex-col items-center gap-2">
+                          <Spinner className="size-5" />
+                          <span className="text-muted-foreground text-sm">
+                            Loading progress...
+                          </span>
+                        </div>
+                      </div>
+                    ) : progressData ? (
+                      <div className="space-y-2">
+                        <div className="text-muted-foreground text-sm">
+                          Progress data is being calculated...
+                        </div>
+                        {progressData.percentage !== undefined && (
+                          <Progress
+                            value={progressData.percentage}
+                            className="h-2"
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground text-sm">
+                        Progress information will be available shortly...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  // Show empty state for failed statuses
+  // Show failed state
   if (isFailed) {
     return (
       <div className={`bg-background min-h-screen ${className}`}>
@@ -224,7 +357,7 @@ export function StockAnalysisDashboard({
     );
   }
 
-  // Show loading state when no data is available
+  // Show loading when no data
   if (!stockData) {
     return (
       <div className={`bg-background min-h-screen ${className}`}>
@@ -306,7 +439,7 @@ export function StockAnalysisDashboard({
                       : "bg-yellow-600 hover:bg-yellow-700"
             }`}
           >
-            {isFailedOnly
+            {isFailed_Only
               ? "FAILED"
               : isNEC
                 ? "NEC"
@@ -373,7 +506,7 @@ export function StockAnalysisDashboard({
                                 : "bg-yellow-100 text-yellow-800"
                       }`}
                     >
-                      {isFailedOnly
+                      {isFailed_Only
                         ? "FAILED"
                         : isNEC
                           ? "NEC"
@@ -407,13 +540,11 @@ export function StockAnalysisDashboard({
                           Analysis for{" "}
                           {stockData?.ticker ?? ticker ?? "this stock"} is
                           currently{" "}
-                          <strong>
-                            {isQueued ? "QUEUED" : "IN PROGRESS"}
-                          </strong>
-                          . {isQueued 
+                          <strong>{isQueued ? "QUEUED" : "IN PROGRESS"}</strong>
+                          .{" "}
+                          {isQueued
                             ? "The analysis has been queued and will begin processing shortly."
-                            : "The system is performing comprehensive multi-factor analysis including technical indicators, fundamental metrics, and market sentiment evaluation."
-                          }
+                            : "The system is performing comprehensive multi-factor analysis including technical indicators, fundamental metrics, and market sentiment evaluation."}
                         </>
                       ) : (
                         <>
@@ -443,10 +574,9 @@ export function StockAnalysisDashboard({
                         <div className="flex items-center gap-3">
                           <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
                           <p className="text-sm text-blue-800 dark:text-blue-400">
-                            {isQueued 
+                            {isQueued
                               ? "Analysis has been queued and will begin processing shortly."
-                              : "Analysis is currently in progress. This may take several minutes to complete."
-                            }
+                              : "Analysis is currently in progress. This may take several minutes to complete."}
                           </p>
                         </div>
                       </div>

@@ -63,6 +63,7 @@ export default async function ReportDashboardPage({ params }: PageProps) {
           sessionId={sessionId}
           status={reportInfo?.status}
           ticker={reportInfo?.ticker}
+          reportId={reportInfo?.reportId}
         />
       </div>
     );
