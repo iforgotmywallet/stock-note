@@ -13,10 +13,9 @@ function ChatHeader() {
       <div className="flex items-center gap-3">
         <BotMessageSquare className="text-primary size-6" />
         <div>
-          <h1 className="text-xl font-semibold">Financial Chat</h1>
+          <h1 className="text-xl font-semibold">Insight Room</h1>
           <p className="text-muted-foreground hidden text-sm sm:block">
-            Chat with AI about your financial reports and get insights about
-            your stock analysis
+            Chat with your selected stock reports and get detailed insights
           </p>
         </div>
       </div>
