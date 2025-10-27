@@ -60,6 +60,13 @@ const AnalysisSearchCardContent = ({
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Calculate credit cost: base cost (2) + analysts count (1 each)
+  const calculateCreditCost = () => {
+    const baseCost = 2;
+    const analystCost = formData.analysts.length;
+    return baseCost + analystCost;
+  };
+
   const handleInputChange = (field: string, value: string): void => {
     setFormData((prev) => ({
       ...prev,
@@ -273,13 +280,18 @@ const AnalysisSearchCardContent = ({
                               onSelect={handleAnalystSelect}
                               value={analyst.id}
                             >
-                              {analyst.label}
-                              {formData.analysts.includes(analyst.id) && (
-                                <CheckIcon
-                                  className="text-muted-foreground"
-                                  size={14}
-                                />
-                              )}
+                              <div className="flex items-center justify-between w-full">
+                                <span>{analyst.label}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">1 credit</span>
+                                  {formData.analysts.includes(analyst.id) && (
+                                    <CheckIcon
+                                      className="text-muted-foreground"
+                                      size={14}
+                                    />
+                                  )}
+                                </div>
+                              </div>
                             </TagsItem>
                           ))}
                         </TagsGroup>
@@ -288,6 +300,27 @@ const AnalysisSearchCardContent = ({
                   </Tags>
                 </div>
               </div>
+
+              {/* Credit Cost Display */}
+              {formData.analysts.length > 0 && (
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground">Credit Cost Breakdown:</p>
+                      <div className="space-y-0.5 text-muted-foreground">
+                        <p>• Base analysis: 2 credits</p>
+                        <p>• Selected analysts ({formData.analysts.length}): {formData.analysts.length} credits</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-foreground">
+                        {calculateCreditCost()} credits
+                      </p>
+                      <p className="text-xs text-muted-foreground">Total cost</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <Button
                 type="submit"
@@ -306,7 +339,10 @@ const AnalysisSearchCardContent = ({
                 ) : (
                   <>
                     <SquareTerminal className="mr-2 h-4 w-4" />
-                    Start Analyze
+                    {formData.analysts.length > 0 
+                      ? `Start Analyze (${calculateCreditCost()} credits)`
+                      : "Start Analyze"
+                    }
                   </>
                 )}
               </Button>

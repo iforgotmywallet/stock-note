@@ -71,6 +71,15 @@ export const generateAnalysis = inngest.createFunction(
           throw new Error("Invalid user ID provided");
         }
 
+        // Calculate total cost: base cost (2) + analysts count (1 each)
+        const baseCost = 2;
+        const analystCost = Array.isArray(analysts) ? analysts.length : 4;
+        const totalCost = baseCost + analystCost;
+
+        console.log(
+          `Credit calculation: Base cost: ${baseCost}, Analysts: ${analystCost}, Total cost: ${totalCost}`,
+        );
+
         const user = await db.user.findUniqueOrThrow({
           where: {
             id: userId,
@@ -80,20 +89,47 @@ export const generateAnalysis = inngest.createFunction(
           },
         });
 
-        if (user.credits <= 0) {
-          throw new Error("Insufficient credits");
+        if (user.credits < totalCost) {
+          console.error(
+            `Insufficient credits: User has ${user.credits}, needs ${totalCost}`,
+          );
+
+          // Update report status to NEC (Not Enough Credits) if credit check fails
+          if (sessionId) {
+            try {
+              await db.agent_reports.update({
+                where: { session_id: sessionId },
+                data: { status: "NEC", updated_at: new Date() },
+              });
+              console.log(
+                `Updated report status to NEC for session: ${sessionId}`,
+              );
+            } catch (updateError) {
+              console.error(
+                "Failed to update report status after credit check failure:",
+                updateError,
+              );
+            }
+          }
+
+          throw new Error(
+            `Insufficient credits. Required: ${totalCost}, Available: ${user.credits}`,
+          );
         }
 
         return {
           success: true,
           message: "Credits check passed",
           credits: user.credits,
+          totalCost,
+          baseCost,
+          analystCost,
           userId,
         };
       } catch (error) {
         console.error("Credit check failed:", error);
 
-        // Update report status to failed if credit check fails
+        // Update report status to NEC if credit check fails
         if (sessionId) {
           try {
             await db.agent_reports.update({
@@ -411,13 +447,16 @@ export const generateAnalysis = inngest.createFunction(
 
     // Step 5: Deduct credit from user
     const creditDeduction = await step.run("deduct-credit", async () => {
+      // Use the total cost calculated in step 1
+      const totalCost = creditCheck.totalCost;
+
       const updatedUser = await db.user.update({
         where: {
           id: userId,
         },
         data: {
           credits: {
-            decrement: 1,
+            decrement: totalCost,
           },
         },
         select: {
@@ -427,10 +466,15 @@ export const generateAnalysis = inngest.createFunction(
 
       return {
         success: true,
-        message: "Credit deducted successfully",
+        message: `Credits deducted successfully (${totalCost} credits)`,
         userId,
         remainingCredits: updatedUser.credits,
-        deductedAmount: 1,
+        deductedAmount: totalCost,
+        breakdown: {
+          baseCost: creditCheck.baseCost,
+          analystCost: creditCheck.analystCost,
+          totalCost: totalCost,
+        },
       };
     });
 
