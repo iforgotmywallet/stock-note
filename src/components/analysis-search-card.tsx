@@ -401,8 +401,8 @@ const AnalysisSearchCardContent = ({
                               <span className="text-muted-foreground text-sm truncate">
                                 - {(() => {
                                     const name = tickerData[formData.ticker];
-                                    return name && name.length > 30 
-                                      ? `${name.substring(0, 30)}...` 
+                                    return name && name.length > 25 
+                                      ? `${name.substring(0, 25)}...` 
                                       : name;
                                   })()}
                               </span>
