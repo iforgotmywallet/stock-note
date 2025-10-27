@@ -96,6 +96,24 @@ const AnalysisSearchCardContent = ({
     return baseCost + analystCost;
   };
 
+  // Clean up ticker names by removing common suffixes
+  const cleanTickerName = (name: string): string => {
+    if (!name) return name;
+    
+    // Split by " - " and take only the first part (company name)
+    const parts = name.split(' - ');
+    return parts[0] || name;
+  };
+
+  // Get today's date in YYYY-MM-DD format for max date restriction
+  const getTodayDate = (): string => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // Load ticker data on component mount
   useEffect(() => {
     const loadTickerData = async () => {
@@ -104,12 +122,13 @@ const AnalysisSearchCardContent = ({
         const data = await response.json() as Record<string, string>;
         setTickerData(data);
         
-        // Create ticker options with truncated names
+        // Create ticker options with cleaned and truncated names
         const options: TickerOption[] = Object.entries(data).map(([ticker, name]) => {
-          const truncatedName = name.length > 50 ? `${name.substring(0, 50)}...` : name;
+          const cleanedName = cleanTickerName(name);
+          const truncatedName = cleanedName.length > 50 ? `${cleanedName.substring(0, 50)}...` : cleanedName;
           return {
             ticker,
-            name,
+            name: cleanedName,
             displayName: `${ticker} - ${truncatedName}`
           };
         });
@@ -454,6 +473,7 @@ const AnalysisSearchCardContent = ({
                     id="analyze_date"
                     type="date"
                     value={formData.analyze_date}
+                    max={getTodayDate()}
                     onChange={(e) =>
                       handleInputChange("analyze_date", e.target.value)
                     }
