@@ -74,20 +74,9 @@ export function StockAnalysisDashboard({
   React.useEffect(() => {
     if (reportData) {
       setStockData(reportData);
-    } else if (!isProcessing && !isFailed) {
-      // Fallback to demo data for development
-      const loadStockData = async () => {
-        try {
-          const response = await fetch("/pypl-dashboard-data.json");
-          const data = (await response.json()) as { data: StockData };
-          setStockData(data.data);
-        } catch (error) {
-          console.error("Failed to load demo data:", error);
-        }
-      };
-      void loadStockData();
     }
-  }, [reportData, isProcessing, isFailed]);
+    // Removed fallback demo data loading - just display failed state when no data
+  }, [reportData]);
 
   // Refresh to view complete report
   const handleRefreshReport = React.useCallback(() => {

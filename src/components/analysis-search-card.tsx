@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import {
@@ -14,12 +14,26 @@ import {
   TagsTrigger,
   TagsValue,
 } from "./ui/shadcn-io/tags";
-import { SquareTerminal, Loader2, CheckIcon } from "lucide-react";
+import { SquareTerminal, Loader2, CheckIcon, ChevronsUpDown, Check } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
 import { queueAnalysisReport } from "~/actions/generation";
 import { ErrorBoundary, AnalysisErrorFallback } from "./error-boundary";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "./ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "./ui/popover";
+import { cn } from "~/lib/utils";
 
 interface FormData {
   ticker: string;
@@ -38,6 +52,17 @@ const analysts: Analyst[] = [
   { id: "news", label: "News" },
   { id: "fundamentals", label: "Fundamentals" },
 ];
+
+// Popular tickers to show in a separate section
+const popularTickers = [
+  "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "NFLX", "PYPL", "ADBE"
+];
+
+interface TickerOption {
+  ticker: string;
+  name: string;
+  displayName: string;
+}
 
 interface AnalysisSearchCardProps {
   onAnalysisComplete?: () => void;
@@ -59,6 +84,10 @@ const AnalysisSearchCardContent = ({
   });
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [tickerData, setTickerData] = useState<Record<string, string>>({});
+  const [tickerOptions, setTickerOptions] = useState<TickerOption[]>([]);
+  const [isTickerDropdownOpen, setIsTickerDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Calculate credit cost: base cost (2) + analysts count (1 each)
   const calculateCreditCost = () => {
@@ -66,6 +95,70 @@ const AnalysisSearchCardContent = ({
     const analystCost = formData.analysts.length;
     return baseCost + analystCost;
   };
+
+  // Load ticker data on component mount
+  useEffect(() => {
+    const loadTickerData = async () => {
+      try {
+        const response = await fetch("/tickers_to_names.json");
+        const data = await response.json() as Record<string, string>;
+        setTickerData(data);
+        
+        // Create ticker options with truncated names
+        const options: TickerOption[] = Object.entries(data).map(([ticker, name]) => {
+          const truncatedName = name.length > 50 ? `${name.substring(0, 50)}...` : name;
+          return {
+            ticker,
+            name,
+            displayName: `${ticker} - ${truncatedName}`
+          };
+        });
+        
+        setTickerOptions(options);
+      } catch (error) {
+        console.error("Failed to load ticker data:", error);
+      }
+    };
+    
+    void loadTickerData();
+  }, []);
+
+  // Optimized filtered results with debouncing and limiting
+  const filteredResults = useMemo(() => {
+    if (!searchQuery.trim()) {
+      // When no search, show popular tickers + limited recent options
+      const popularOptions = popularTickers
+        .filter(ticker => tickerData[ticker])
+        .map(ticker => ({
+          ticker,
+          name: tickerData[ticker],
+          displayName: `${ticker} - ${tickerData[ticker]}`
+        }));
+      
+      const otherOptions = tickerOptions
+        .filter(option => !popularTickers.includes(option.ticker))
+        .slice(0, 20); // Limit to first 20 when no search
+      
+      return { popular: popularOptions, others: otherOptions };
+    }
+
+    const query = searchQuery.toLowerCase();
+    const matchingOptions = tickerOptions.filter(option => 
+      option.ticker.toLowerCase().includes(query) || 
+      option.name.toLowerCase().includes(query)
+    );
+
+    // Separate popular from others in search results
+    const popularMatches = matchingOptions.filter(option => 
+      popularTickers.includes(option.ticker)
+    );
+    
+    const otherMatches = matchingOptions
+      .filter(option => !popularTickers.includes(option.ticker))
+      .slice(0, 50); // Limit search results to 50
+
+    return { popular: popularMatches, others: otherMatches };
+  }, [searchQuery, tickerOptions, tickerData]);
 
   const handleInputChange = (field: string, value: string): void => {
     setFormData((prev) => ({
@@ -232,16 +325,128 @@ const AnalysisSearchCardContent = ({
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="ticker">Ticker Symbol *</Label>
-                  <Input
-                    id="ticker"
-                    placeholder="e.g., AAPL, TSLA, MSFT"
-                    value={formData.ticker}
-                    onChange={(e) =>
-                      handleInputChange("ticker", e.target.value.toUpperCase())
-                    }
-                    required
-                    disabled={isAnalyzing}
-                  />
+                  <Popover 
+                    open={isTickerDropdownOpen} 
+                    onOpenChange={(open) => {
+                      setIsTickerDropdownOpen(open);
+                      if (!open) {
+                        setSearchQuery("");
+                      }
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isTickerDropdownOpen}
+                        className="w-full justify-between"
+                        disabled={isAnalyzing}
+                      >
+                        {formData.ticker ? (
+                          <span className="flex items-center gap-2">
+                            <span className="font-medium">{formData.ticker}</span>
+                            {tickerData[formData.ticker] && (
+                              <span className="text-muted-foreground text-sm truncate">
+                                - {(() => {
+                                    const name = tickerData[formData.ticker];
+                                    return name && name.length > 30 
+                                      ? `${name.substring(0, 30)}...` 
+                                      : name;
+                                  })()}
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          "Select ticker..."
+                        )}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput 
+                          placeholder="Search tickers..." 
+                          value={searchQuery}
+                          onValueChange={setSearchQuery}
+                        />
+                        <CommandList>
+                          <CommandEmpty>No ticker found.</CommandEmpty>
+                          
+                          {/* Popular Tickers Section */}
+                          {filteredResults.popular.length > 0 && (
+                            <CommandGroup heading="Popular Tickers">
+                              {filteredResults.popular.map((option) => (
+                                <CommandItem
+                                  key={option.ticker}
+                                  value={option.ticker}
+                                  onSelect={() => {
+                                    handleInputChange("ticker", option.ticker);
+                                    setIsTickerDropdownOpen(false);
+                                    setSearchQuery("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.ticker === option.ticker ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{option.ticker}</span>
+                                    <span className="text-sm text-muted-foreground truncate">
+                                      {option.name && option.name.length > 40 
+                                        ? `${option.name.substring(0, 40)}...` 
+                                        : option.name}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
+                          
+                          {/* Other Tickers Section */}
+                          {filteredResults.others.length > 0 && (
+                            <CommandGroup heading={searchQuery ? "Other Results" : "Recent Tickers"}>
+                              {filteredResults.others.map((option) => (
+                                <CommandItem
+                                  key={option.ticker}
+                                  value={`${option.ticker} ${option.name}`}
+                                  onSelect={() => {
+                                    handleInputChange("ticker", option.ticker);
+                                    setIsTickerDropdownOpen(false);
+                                    setSearchQuery("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.ticker === option.ticker ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{option.ticker}</span>
+                                    <span className="text-sm text-muted-foreground truncate">
+                                      {option.name && option.name.length > 40 
+                                        ? `${option.name.substring(0, 40)}...` 
+                                        : option.name}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
+                          
+                          {/* Show count when searching */}
+                          {searchQuery && (
+                            <div className="px-2 py-1 text-xs text-muted-foreground border-t">
+                              Showing {filteredResults.popular.length + filteredResults.others.length} results
+                              {filteredResults.others.length === 50 && " (limited to 50)"}
+                            </div>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="analyze_date">Analyze Date *</Label>
