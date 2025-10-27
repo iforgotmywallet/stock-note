@@ -1,6 +1,6 @@
 "use client";
 
-import { IconCoins } from "@tabler/icons-react";
+import { IconCoins, IconRefresh } from "@tabler/icons-react";
 import { useUserCredits } from "~/hooks/use-user-credits";
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
@@ -12,7 +12,7 @@ interface CreditDisplayProps {
 }
 
 export function CreditDisplay({ userId, className }: CreditDisplayProps) {
-  const { credits, loading, error } = useUserCredits(userId);
+  const { credits, loading, error, refetch } = useUserCredits(userId);
 
   // Don't render anything if no user
   if (!userId) {
@@ -29,18 +29,31 @@ export function CreditDisplay({ userId, className }: CreditDisplayProps) {
     });
   };
 
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the upgrade click
+    await refetch();
+  };
+
   // Loading state with proper spacing and alignment
   if (loading) {
     return (
       <div
         className={cn(
-          "flex items-center gap-1.5 rounded-md px-2 py-1.5",
+          "flex items-center gap-1 rounded-md px-2 py-1.5",
           "transition-colors duration-200",
           className,
         )}
       >
         <IconCoins className="text-muted-foreground h-4 w-4 shrink-0" />
         <Skeleton className="h-3.5 w-12 lg:w-16" />
+        <button
+          onClick={handleRefresh}
+          disabled={loading}
+          className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"
+          title="Refresh credits"
+        >
+          <IconRefresh className="h-3 w-3" />
+        </button>
       </div>
     );
   }
@@ -51,25 +64,38 @@ export function CreditDisplay({ userId, className }: CreditDisplayProps) {
   }
 
   return (
-    <button
-      onClick={handleUpgrade}
-      className={cn(
-        "flex items-center gap-1.5 rounded-md px-2 py-1.5",
-        "text-muted-foreground text-sm",
-        "transition-colors duration-200",
-        "hover:bg-accent/50 hover:text-foreground",
-        "focus:ring-ring focus:ring-2 focus:ring-offset-2 focus:outline-none",
-        "cursor-pointer",
-        className,
-      )}
-    >
-      <IconCoins className="h-4 w-4 shrink-0" />
-      {/* Desktop: Show full text */}
-      <span className="hidden font-medium sm:inline">
-        {credits} {credits === 1 ? "credit" : "credits"}
-      </span>
-      {/* Mobile: Show just the number */}
-      <span className="font-medium tabular-nums sm:hidden">{credits}</span>
-    </button>
+    <div className={cn("flex items-center gap-1", className)}>
+      <button
+        onClick={handleUpgrade}
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-2 py-1.5",
+          "text-muted-foreground text-sm",
+          "transition-colors duration-200",
+          "hover:bg-accent/50 hover:text-foreground",
+          "focus:ring-ring focus:ring-2 focus:ring-offset-2 focus:outline-none",
+          "cursor-pointer",
+        )}
+      >
+        <IconCoins className="h-4 w-4 shrink-0" />
+        {/* Desktop: Show full text */}
+        <span className="hidden font-medium sm:inline">
+          {credits} {credits === 1 ? "credit" : "credits"}
+        </span>
+        {/* Mobile: Show just the number */}
+        <span className="font-medium tabular-nums sm:hidden">{credits}</span>
+      </button>
+      <button
+        onClick={handleRefresh}
+        disabled={loading}
+        className={cn(
+          "text-muted-foreground hover:text-foreground p-1 rounded transition-colors",
+          "focus:ring-ring focus:ring-2 focus:ring-offset-2 focus:outline-none",
+          "disabled:opacity-50 disabled:cursor-not-allowed"
+        )}
+        title="Refresh credits"
+      >
+        <IconRefresh className={cn("h-3 w-3", loading && "animate-spin")} />
+      </button>
+    </div>
   );
 }
