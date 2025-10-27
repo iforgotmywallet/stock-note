@@ -88,6 +88,7 @@ const AnalysisSearchCardContent = ({
   const [tickerOptions, setTickerOptions] = useState<TickerOption[]>([]);
   const [isTickerDropdownOpen, setIsTickerDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [maxDate, setMaxDate] = useState("");
 
   // Calculate credit cost: base cost (2) + analysts count (1 each)
   const calculateCreditCost = () => {
@@ -105,14 +106,23 @@ const AnalysisSearchCardContent = ({
     return parts[0] || name;
   };
 
-  // Get today's date in YYYY-MM-DD format for max date restriction
+  // Get today's date in YYYY-MM-DD format for max date restriction (local time)
   const getTodayDate = (): string => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
+    // Create a new Date object and ensure we're using local time
+    const now = new Date();
+    
+    // Get local date components (these methods use local timezone)
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    
     return `${year}-${month}-${day}`;
   };
+
+  // Set max date on client side to ensure local timezone
+  useEffect(() => {
+    setMaxDate(getTodayDate());
+  }, []);
 
   // Load ticker data on component mount
   useEffect(() => {
@@ -473,7 +483,7 @@ const AnalysisSearchCardContent = ({
                     id="analyze_date"
                     type="date"
                     value={formData.analyze_date}
-                    max={getTodayDate()}
+                    max={maxDate}
                     onChange={(e) =>
                       handleInputChange("analyze_date", e.target.value)
                     }
