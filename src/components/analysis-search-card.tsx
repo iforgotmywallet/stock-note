@@ -177,12 +177,35 @@ const AnalysisSearchCardContent = ({
       option.name.toLowerCase().includes(query)
     );
 
+    // Sort matches by relevance: exact ticker match > ticker starts with > name contains
+    const sortedMatches = matchingOptions.sort((a, b) => {
+      const aTickerLower = a.ticker.toLowerCase();
+      const bTickerLower = b.ticker.toLowerCase();
+      const aNameLower = a.name.toLowerCase();
+      const bNameLower = b.name.toLowerCase();
+
+      // Exact ticker match gets highest priority
+      if (aTickerLower === query && bTickerLower !== query) return -1;
+      if (bTickerLower === query && aTickerLower !== query) return 1;
+
+      // Ticker starts with query gets second priority
+      if (aTickerLower.startsWith(query) && !bTickerLower.startsWith(query)) return -1;
+      if (bTickerLower.startsWith(query) && !aTickerLower.startsWith(query)) return 1;
+
+      // Name starts with query gets third priority
+      if (aNameLower.startsWith(query) && !bNameLower.startsWith(query)) return -1;
+      if (bNameLower.startsWith(query) && !aNameLower.startsWith(query)) return 1;
+
+      // Default alphabetical sort by ticker
+      return aTickerLower.localeCompare(bTickerLower);
+    });
+
     // Separate popular from others in search results
-    const popularMatches = matchingOptions.filter(option => 
+    const popularMatches = sortedMatches.filter(option => 
       popularTickers.includes(option.ticker)
     );
     
-    const otherMatches = matchingOptions
+    const otherMatches = sortedMatches
       .filter(option => !popularTickers.includes(option.ticker))
       .slice(0, 50); // Limit search results to 50
 
