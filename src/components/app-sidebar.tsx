@@ -69,9 +69,9 @@ class SidebarErrorBoundary extends React.Component<
 
 const data = {
   user: {
-    name: "shadcn",
+    name: "me",
     email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    avatar: "/avatar.svg",
   },
   navMain: [
     {

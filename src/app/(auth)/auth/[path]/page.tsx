@@ -1,5 +1,6 @@
 import { AuthView } from "@daveyplate/better-auth-ui";
 import { IconStackMiddle } from "@tabler/icons-react";
+import { TermsConditionsModal } from "~/components/terms-conditions-modal";
 
 // Force dynamic rendering to avoid static generation issues
 export const dynamic = "force-dynamic";
@@ -24,6 +25,17 @@ export default async function AuthPage({ params }: AuthPageProps) {
           StockNotes
         </a>
         <AuthView path={path} />
+        
+        <div className="text-center">
+          <p className="text-muted-foreground/60 text-xs">
+            By logging in or signing up to StockNotes, you agree to our{" "}
+            <TermsConditionsModal>
+              <button className="text-muted-foreground/60 underline underline-offset-2 hover:text-muted-foreground transition-colors">
+                Terms & Conditions
+              </button>
+            </TermsConditionsModal>
+          </p>
+        </div>
       </div>
     </div>
   );
