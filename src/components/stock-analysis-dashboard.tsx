@@ -28,6 +28,7 @@ import { Progress } from "~/components/ui/progress";
 import { Spinner } from "~/components/ui/spinner";
 import { MarkdownRenderer } from "~/components/markdown-renderer";
 import { extractLocalTimeFromSessionId } from "~/lib/utils";
+
 import type { StockData } from "~/types/stock-data";
 import type { ProgressData } from "~/components/progress-popover";
 
@@ -40,6 +41,7 @@ interface StockAnalysisDashboardProps {
   status?: ReportStatus;
   ticker?: string;
   reportId?: string;
+  price?: string | null;
 }
 
 export function StockAnalysisDashboard({
@@ -49,6 +51,7 @@ export function StockAnalysisDashboard({
   status,
   ticker,
   reportId,
+  price,
 }: StockAnalysisDashboardProps) {
   // Status checks
   const isProcessing = status === "processing" || status === "queued";
@@ -115,14 +118,8 @@ export function StockAnalysisDashboard({
     }
   }, [isProcessing, reportId, status]);
 
-  // Extract price from market report
-  const extractedData = React.useMemo(() => {
-    if (!stockData?.analysis?.market_report) return null;
-    const priceMatch = /\*\*Current Price\*\*.*?(\d+\.\d+)/.exec(
-      stockData.analysis.market_report,
-    );
-    return { currentPrice: priceMatch ? priceMatch[1] : "N/A" };
-  }, [stockData]);
+  // Use price from database
+  const currentPrice = price ?? "N/A";
 
   const tabs = [
     { id: "overview", label: "Overview", icon: IconDashboard },
@@ -411,7 +408,7 @@ export function StockAnalysisDashboard({
               </span>
               , the price is{" "}
               <span className="rounded-md bg-green-50 px-1.5 py-0.5 font-mono text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                ${extractedData?.currentPrice ?? "Loading..."}
+                ${currentPrice}
               </span>
             </p>
           </div>

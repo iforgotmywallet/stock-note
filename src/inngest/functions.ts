@@ -229,7 +229,146 @@ export const generateAnalysis = inngest.createFunction(
       },
     );
 
-    // Step 3: Send POST request to analysis service
+    // Step 3: Fetch current stock price from Finnhub API and update database
+    const priceUpdateResult = await step.fetch(
+      `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${env.FINNHUB_API_KEY}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    const priceExtractionResult = await step.run("update-price", async () => {
+      try {
+        console.log(`Fetching current price for ${ticker} (${sessionId})`);
+
+        // Validate Finnhub API response status first
+        if (!priceUpdateResult.ok) {
+          console.error("Finnhub API request failed:", {
+            status: priceUpdateResult.status,
+            statusText: priceUpdateResult.statusText,
+            sessionId,
+            ticker,
+          });
+
+          let errorMessage = `Finnhub API request failed: ${priceUpdateResult.statusText}`;
+          if (
+            priceUpdateResult.status === 401 ||
+            priceUpdateResult.status === 403
+          ) {
+            errorMessage =
+              "Finnhub API authentication failed - invalid API key";
+          } else if (priceUpdateResult.status === 429) {
+            errorMessage = "Finnhub API rate limit exceeded";
+          } else if (priceUpdateResult.status >= 500) {
+            errorMessage = "Finnhub API service temporarily unavailable";
+          }
+
+          throw new Error(errorMessage);
+        }
+
+        // Parse the Finnhub API response
+        const priceData = await priceUpdateResult.json();
+        console.log(
+          "Finnhub API response:",
+          JSON.stringify(priceData, null, 2),
+        );
+
+        // Extract current price from Finnhub response
+        // Finnhub response format: { "c": 261.74, "h": 263.31, "l": 260.68, "o": 261.07, "pc": 259.45, "t": 1582641000 }
+        // "c" is the current price
+        const currentPrice = priceData?.c;
+
+        if (
+          currentPrice === undefined ||
+          currentPrice === null ||
+          typeof currentPrice !== "number"
+        ) {
+          console.error("Invalid price data in Finnhub response:", {
+            priceData,
+            currentPrice,
+            sessionId,
+            ticker,
+          });
+          throw new Error(
+            "Current price not available or invalid in Finnhub API response",
+          );
+        }
+
+        // Validate price is a reasonable number (not NaN, not negative, not zero)
+        if (isNaN(currentPrice) || currentPrice <= 0) {
+          console.error("Invalid price value from Finnhub:", {
+            currentPrice,
+            sessionId,
+            ticker,
+          });
+          throw new Error(
+            `Invalid price value received from Finnhub: ${currentPrice}`,
+          );
+        }
+
+        const priceString = currentPrice.toString();
+
+        console.log(`Current price for ${ticker}: $${priceString}`);
+
+        // Update the agent_reports table with the current price
+        const updatedReport = await db.agent_reports.update({
+          where: {
+            session_id: sessionId,
+          },
+          data: {
+            price: priceString,
+            updated_at: new Date(),
+          },
+          select: {
+            id: true,
+            price: true,
+          },
+        });
+
+        return {
+          success: true,
+          message: "Price fetch and update completed successfully",
+          sessionId,
+          currentPrice: priceString,
+          finnhubData: priceData,
+          reportUpdated: !!updatedReport,
+          reportId: updatedReport.id,
+        };
+      } catch (error) {
+        console.error("Price fetch step failed:", {
+          error: error instanceof Error ? error.message : error,
+          sessionId,
+          ticker,
+        });
+
+        // Update report status to failed when price fetch encounters errors
+        try {
+          await db.agent_reports.update({
+            where: { session_id: sessionId },
+            data: {
+              status: "failed",
+              updated_at: new Date(),
+            },
+          });
+          console.log(
+            `Updated report status to failed due to price fetch error for session: ${sessionId}`,
+          );
+        } catch (updateError) {
+          console.error(
+            "Failed to update report status after price fetch failure:",
+            updateError,
+          );
+        }
+
+        // Re-throw the error to ensure the step fails
+        throw error;
+      }
+    });
+
+    // Step 4: Send POST request to analysis service
     console.log(`Sending analysis request for ${ticker} (${sessionId})`);
 
     const requestBody = {
@@ -367,7 +506,7 @@ export const generateAnalysis = inngest.createFunction(
       analysisData: result,
     };
 
-    // Step 4: Update analyst report status and add to recent list
+    // Step 5: Update analyst report status and add to recent list
     const updateResult = await step.run(
       "update-report-and-recent-list",
       async () => {
@@ -445,7 +584,7 @@ export const generateAnalysis = inngest.createFunction(
       },
     );
 
-    // Step 5: Deduct credit from user
+    // Step 6: Deduct credit from user
     const creditDeduction = await step.run("deduct-credit", async () => {
       // Use the total cost calculated in step 1
       const totalCost = creditCheck.totalCost;
@@ -484,6 +623,7 @@ export const generateAnalysis = inngest.createFunction(
       steps: {
         creditCheck,
         statusUpdate,
+        priceExtractionResult,
         analysisResult,
         updateResult,
         creditDeduction,

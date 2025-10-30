@@ -28,6 +28,7 @@ model agent_reports {
   portfolio_manager_report    String?
   final_analysis              String?
   recommendation              String?      @db.VarChar(15)
+  price                       String?
   userId                      String
   published                   Boolean      @default(false)
   status                      String       @default("queued")
@@ -43,6 +44,7 @@ model agent_reports {
   @@index([ticker], map: "idx_agent_reports_ticker")
   @@index([ticker, analysis_date], map: "idx_agent_reports_ticker_date")
   @@index([userId], map: "idx_agent_reports_user_id")
+  @@index([price], map: "idx_agent_reports_price")
 }
 
 model User {

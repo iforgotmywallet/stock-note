@@ -64,6 +64,7 @@ export default async function ReportDashboardPage({ params }: PageProps) {
           status={reportInfo?.status as "queued" | "processing" | "done" | "failed" | "NEC" | undefined}
           ticker={reportInfo?.ticker}
           reportId={reportInfo?.reportId}
+          price={reportInfo?.price}
         />
       </div>
     );
