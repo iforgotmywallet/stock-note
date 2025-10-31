@@ -1,11 +1,12 @@
 import { serve } from "inngest/next";
 import { inngest } from "../../../inngest/client";
-import { generateAnalysis } from "~/inngest/functions";
+import {
+  generateAnalysis,
+  dailyPortfolioCron,
+} from "~/inngest/functions/index";
 
-// Create an API that serves zero functions
+// Create an API that serves all functions
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [
-    generateAnalysis
-  ],
+  functions: [generateAnalysis, dailyPortfolioCron],
 });

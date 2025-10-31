@@ -93,3 +93,27 @@ export function extractLocalTimeFromSessionId(sessionId: string): Date | null {
 
   return null;
 }
+
+/**
+ * Calculate effective allocation per ticker, normalizing if total exceeds 100%
+ *
+ * @param allocation - The desired allocation per ticker (0.1 = 10%)
+ * @param tickersCount - Number of tickers in the portfolio
+ * @param allowLeverage - Whether to allow total allocation > 100%
+ * @returns The effective allocation per ticker
+ *
+ * @example
+ * getEffectiveAllocation(0.2, 3, false) // returns 0.067 (6.7% each, normalized from 60% total)
+ * getEffectiveAllocation(0.1, 5, false) // returns 0.1 (10% each, 50% total is fine)
+ * getEffectiveAllocation(0.3, 4, true) // returns 0.3 (30% each, 120% total allowed)
+ */
+export function getEffectiveAllocation(
+  allocation: number,
+  tickersCount: number,
+  allowLeverage = false,
+) {
+  const total = allocation * tickersCount;
+  if (allowLeverage || total <= 1) return allocation;
+  // normalize if over 100%
+  return allocation / total;
+}

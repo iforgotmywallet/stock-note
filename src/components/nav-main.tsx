@@ -6,6 +6,7 @@ import {
   type Icon,
 } from "@tabler/icons-react";
 import { useRouter, usePathname } from "next/navigation";
+import { useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -15,11 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "~/components/ui/sidebar";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
+import { PortfolioCreateDialog } from "~/components/portfolio-create-dialog";
 
 export function NavMain({
   items,
@@ -32,9 +29,21 @@ export function NavMain({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isPortfolioDialogOpen, setIsPortfolioDialogOpen] = useState(false);
 
   const handleStartAnalysis = () => {
     router.push("/");
+  };
+
+  const handleCalendarClick = () => {
+    setIsPortfolioDialogOpen(true);
+  };
+
+  const handlePortfolioCreated = () => {
+    // Refresh the page if we're on the portfolio page to show the new portfolio
+    if (pathname === "/portfolio") {
+      router.refresh();
+    }
   };
 
   return (
@@ -50,20 +59,15 @@ export function NavMain({
               <IconTerminal2 />
               <span>Start Analysis</span>
             </SidebarMenuButton>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  className="size-8 group-data-[collapsible=icon]:opacity-0"
-                  variant="outline"
-                >
-                  <IconCalendarTime />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Automate your stock analytics — coming soon</p>
-              </TooltipContent>
-            </Tooltip>
+            <Button
+              size="icon"
+              className="size-8 group-data-[collapsible=icon]:opacity-0"
+              variant="outline"
+              onClick={handleCalendarClick}
+              title="Create Portfolio"
+            >
+              <IconCalendarTime />
+            </Button>
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
@@ -112,6 +116,12 @@ export function NavMain({
           })}
         </SidebarMenu>
       </SidebarGroupContent>
+      
+      <PortfolioCreateDialog
+        open={isPortfolioDialogOpen}
+        onOpenChange={setIsPortfolioDialogOpen}
+        onPortfolioCreated={handlePortfolioCreated}
+      />
     </SidebarGroup>
   );
 }

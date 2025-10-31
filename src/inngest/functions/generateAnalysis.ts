@@ -1,5 +1,5 @@
 import { db } from "~/server/db";
-import { inngest } from "./client";
+import { inngest } from "../client";
 import { env } from "~/env";
 
 export const generateAnalysis = inngest.createFunction(
@@ -314,7 +314,7 @@ export const generateAnalysis = inngest.createFunction(
 
           const priceString = currentPrice.toString();
 
-          console.log(`Current price for ${ticker}: $${priceString}`);
+          console.log(`Current price for ${ticker}: ${priceString}`);
 
           // Update the agent_reports table with the current price
           const updatedReport = await db.agent_reports.update({
@@ -402,11 +402,17 @@ export const generateAnalysis = inngest.createFunction(
     console.log(
       `Analysis service response: ${response.status} ${response.statusText}`,
     );
+    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
 
     // Parse and validate response
     let result;
     try {
-      result = await response.json();
+      // First get the raw response text for debugging
+      const responseText = await response.text();
+      console.log("Raw response text:", responseText.substring(0, 500)); // Log first 500 chars
+      
+      // Try to parse as JSON
+      result = JSON.parse(responseText);
       console.log("Parsed response:", JSON.stringify(result, null, 2));
     } catch (parseError) {
       console.error("Failed to parse response JSON:", parseError);
@@ -621,6 +627,30 @@ export const generateAnalysis = inngest.createFunction(
       };
     });
 
+    // Step 7: Update portfolio data after analysis completes (ADMIN ONLY)
+    let portfolioUpdate = null;
+    if (userId === env.ADMIN_USER_SECRET_ID) {
+      portfolioUpdate = await step.run("update-portfolio-data", async () => {
+        try {
+          const { updatePortfolioFromReport } = await import(
+            "~/lib/utils/update-portfolio"
+          );
+          const result = await updatePortfolioFromReport({ sessionId });
+          return { success: true, ...result };
+        } catch (error) {
+          console.error("Portfolio update failed:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : error,
+          };
+        }
+      });
+    } else {
+      console.log(
+        `Skipping portfolio update - userId ${userId} is not admin user`,
+      );
+    }
+
     return {
       success: true,
       message: "Analysis workflow completed successfully",
@@ -631,6 +661,7 @@ export const generateAnalysis = inngest.createFunction(
         analysisResult,
         updateResult,
         creditDeduction,
+        ...(portfolioUpdate && { portfolioUpdate }), // Only include if executed
       },
       finalResult: analysisResult.analysisData,
     };

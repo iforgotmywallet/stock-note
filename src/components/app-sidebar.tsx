@@ -12,6 +12,7 @@ import {
   IconAlertCircle,
   IconTable,
   IconMessageChatbot,
+  IconBriefcase,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "~/components/nav-documents";
@@ -83,6 +84,11 @@ const data = {
       title: "Chat",
       url: "/chat",
       icon: IconMessageChatbot,
+    },
+    {
+      title: "Portfolio",
+      url: "/portfolio",
+      icon: IconBriefcase,
     },
   ],
   navClouds: [

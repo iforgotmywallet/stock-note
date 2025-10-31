@@ -19,6 +19,7 @@ export const env = createEnv({
     POLAR_ACCESS_TOKEN: z.string(),
     POLAR_WEBHOOK_SECRET: z.string(),
     FINNHUB_API_KEY: z.string(),
+    ADMIN_USER_SECRET_ID: z.string(),
   },
 
   /**
@@ -46,6 +47,7 @@ export const env = createEnv({
     POLAR_ACCESS_TOKEN: process.env.POLAR_ACCESS_TOKEN,
     POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET,
     FINNHUB_API_KEY: process.env.FINNHUB_API_KEY,
+    ADMIN_USER_SECRET_ID: process.env.ADMIN_USER_SECRET_ID,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

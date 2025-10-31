@@ -8,12 +8,12 @@ datasource db {
 }
 
 model agent_reports {
-  id                          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  session_id                  String       @unique @db.VarChar(255)
-  ticker                      String       @db.VarChar(10)
-  analysis_date               DateTime     @db.Date
-  created_at                  DateTime?    @default(now()) @db.Timestamptz(6)
-  updated_at                  DateTime?    @default(now()) @db.Timestamptz(6)
+  id                          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id                  String            @unique @db.VarChar(255)
+  ticker                      String            @db.VarChar(10)
+  analysis_date               DateTime          @db.Date
+  created_at                  DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime?         @default(now()) @db.Timestamptz(6)
   market_analyst_report       String?
   news_analyst_report         String?
   fundamentals_analyst_report String?
@@ -27,14 +27,15 @@ model agent_reports {
   safe_analyst_report         String?
   portfolio_manager_report    String?
   final_analysis              String?
-  recommendation              String?      @db.VarChar(15)
+  recommendation              String?           @db.VarChar(15)
   price                       String?
   userId                      String
-  published                   Boolean      @default(false)
-  status                      String       @default("queued")
-  user                        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  published                   Boolean           @default(false)
+  status                      String            @default("queued")
+  user                        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   recentList                  RecentList[]
   savedList                   SavedList[]
+  portfolioActions            PortfolioAction[]
 
   @@index([created_at], map: "idx_agent_reports_created_at")
   @@index([published], map: "idx_agent_reports_published")
@@ -61,7 +62,7 @@ model User {
   recentList    RecentList[]
   savedList     SavedList[]
   sessions      Session[]
-  watchlist     Watchlist[]
+  portfolios    Portfolio[]
 
   @@map("user")
 }
@@ -111,32 +112,15 @@ model Verification {
 }
 
 model Stock {
-  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  symbol    String      @unique @db.VarChar(10)
-  company   String      @db.VarChar(255)
-  sector    String?     @db.VarChar(100)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  watchlist Watchlist[]
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  symbol    String   @unique @db.VarChar(10)
+  company   String   @db.VarChar(255)
+  sector    String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([symbol], map: "idx_stock_symbol")
   @@map("stock")
-}
-
-model Watchlist {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String
-  stockId   String   @db.Uuid
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  stock     Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, stockId], name: "unique_user_stock")
-  @@index([userId], map: "idx_watchlist_user_id")
-  @@index([stockId], map: "idx_watchlist_stock_id")
-  @@index([createdAt], map: "idx_watchlist_created_at")
-  @@map("watchlist")
 }
 
 model RecentList {
@@ -173,4 +157,70 @@ model SavedList {
   @@index([savedAt], map: "idx_saved_list_saved_at")
   @@index([createdAt], map: "idx_saved_list_created_at")
   @@map("saved_list")
+}
+
+model Portfolio {
+  id                    String                @id @default(uuid())
+  userId                String
+  name                  String
+  description           String?
+  days_of_week          String[] // e.g. ["monday","wednesday","friday"]
+  allocation_per_ticker Float                 @default(0.20)
+  enabled               Boolean               @default(true)
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @default(now())
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tickers               PortfolioTicker[]
+  actions               PortfolioAction[]
+  positions             PortfolioPosition[]
+  daily_values          PortfolioDailyValue[]
+}
+
+model PortfolioTicker {
+  id          String    @id @default(uuid())
+  portfolioId String
+  ticker      String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+}
+
+model PortfolioAction {
+  id              String         @id @default(uuid())
+  portfolioId     String
+  session_id      String // link to agent_reports.session_id
+  ticker          String
+  action_date     DateTime       @default(now())
+  action          String // "BUY" | "SELL" | "HOLD"
+  price_at_action Float
+  shares          Float
+  note            String?        // Optional note for the action
+  created_at      DateTime       @default(now())
+  portfolio       Portfolio      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  agent_report    agent_reports? @relation(fields: [session_id], references: [session_id])
+}
+
+model PortfolioPosition {
+  id          String    @id @default(uuid())
+  portfolioId String
+  ticker      String
+  shares      Float     @default(0) // + long, - short
+  avg_cost    Float     @default(0)
+  debt_value  Float     @default(0)
+  last_price  Float?
+  updated_at  DateTime  @default(now())
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, ticker])
+}
+
+model PortfolioDailyValue {
+  id               String    @id @default(uuid())
+  portfolioId      String
+  date             DateTime
+  cash_balance     Float     @default(0)
+  long_value       Float     @default(0)
+  short_value      Float     @default(0)
+  net_value        Float     @default(0)
+  total_return_pct Float?
+  created_at       DateTime  @default(now())
+  portfolio        Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
 }
