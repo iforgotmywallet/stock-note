@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Progress } from "~/components/ui/progress";
@@ -26,6 +26,8 @@ interface PortfolioPosition {
 interface PerformanceSummaryProps {
   positions: PortfolioPosition[];
   portfolioLeverage?: number; // e.g., 4.0
+  livePrices?: Record<string, number>; // ticker -> live price from WebSocket
+  priceTimestamps?: Record<string, number>; // ticker -> timestamp of last update
 }
 
 interface PerformanceMetrics {
@@ -47,94 +49,113 @@ interface PerformanceMetrics {
 export function PortfolioPerformanceSummary({
   positions,
   portfolioLeverage = 1.0,
+  livePrices,
+  priceTimestamps,
 }: PerformanceSummaryProps) {
-  const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
-
   const STARTING_CAPITAL = 100_000;
 
-  const calculateMetrics = (
-    positions: PortfolioPosition[],
-    leverage: number,
-  ): PerformanceMetrics => {
-    let longValue = 0;
-    let shortValue = 0;
-    let longCost = 0;
-    let shortProceeds = 0;
-    let unrealizedPnl = 0;
-    let wins = 0;
-    let lastUpdate: Date | null = null;
+  // Determine if we're using live prices
+  const usingLivePrices = livePrices && Object.keys(livePrices).length > 0;
+  const priceSource: "websocket" | "http" = usingLivePrices
+    ? "websocket"
+    : "http";
 
-    for (const p of positions) {
-      const price = p.last_price ?? 0;
-      if (!price || p.shares === 0) continue;
-      const abs = Math.abs(p.shares);
-      const updatedAt = new Date(p.updated_at);
-      if (!isNaN(updatedAt.getTime()) && (!lastUpdate || updatedAt > lastUpdate)) {
-        lastUpdate = updatedAt;
+  // Memoize the expensive calculateMetrics function to prevent unnecessary recalculations
+  const metrics = useMemo(() => {
+    const calculateMetrics = (
+      positions: PortfolioPosition[],
+      leverage: number,
+    ): PerformanceMetrics => {
+      let longValue = 0;
+      let shortValue = 0;
+      let longCost = 0;
+      let shortProceeds = 0;
+      let unrealizedPnl = 0;
+      let wins = 0;
+      let lastUpdate: Date | null = null;
+
+      for (const p of positions) {
+        // Prefer live prices over stored last_price
+        const price = (livePrices && livePrices[p.ticker]) ?? p.last_price ?? 0;
+        if (!price || p.shares === 0) continue;
+        const abs = Math.abs(p.shares);
+
+        // Use price timestamp if available from WebSocket, otherwise use position updated_at
+        let updatedAt: Date;
+        if (priceTimestamps && priceTimestamps[p.ticker] !== undefined) {
+          updatedAt = new Date(priceTimestamps[p.ticker]!);
+        } else {
+          updatedAt = new Date(p.updated_at);
+        }
+
+        if (
+          !isNaN(updatedAt.getTime()) &&
+          (!lastUpdate || updatedAt > lastUpdate)
+        ) {
+          lastUpdate = updatedAt;
+        }
+
+        if (p.shares > 0) {
+          // Long
+          longValue += abs * price;
+          longCost += abs * p.avg_cost;
+          const pnl = (price - p.avg_cost) * abs;
+          unrealizedPnl += pnl;
+          if (pnl > 0) wins++;
+        } else {
+          // Short
+          shortValue += abs * price;
+          shortProceeds += abs * p.avg_cost;
+          const pnl = (p.avg_cost - price) * abs;
+          unrealizedPnl += pnl;
+          if (pnl > 0) wins++;
+        }
       }
 
-      if (p.shares > 0) {
-        // Long
-        longValue += abs * price;
-        longCost += abs * p.avg_cost;
-        const pnl = (price - p.avg_cost) * abs;
-        unrealizedPnl += pnl;
-        if (pnl > 0) wins++;
-      } else {
-        // Short
-        shortValue += abs * price;
-        shortProceeds += abs * p.avg_cost;
-        const pnl = (p.avg_cost - price) * abs;
-        unrealizedPnl += pnl;
-        if (pnl > 0) wins++;
-      }
-    }
+      // 🧮 Cash after establishing positions
+      const cash = STARTING_CAPITAL - longCost + shortProceeds;
 
-    // 🧮 Cash after establishing positions
-    const cash = STARTING_CAPITAL - longCost + shortProceeds;
+      // 🧮 Equity = cash + longValue - shortValue
+      const equity = cash + longValue - shortValue;
 
-    // 🧮 Equity = cash + longValue - shortValue
-    const equity = cash + longValue - shortValue;
+      // 🧮 Gross exposure
+      const grossExposure = longValue + shortValue;
 
-    // 🧮 Gross exposure
-    const grossExposure = longValue + shortValue;
+      // 🧮 Leverage capacity and usage
+      const leveragedCapital = equity * leverage;
+      const leverageUsedPct =
+        leveragedCapital > 0 ? (grossExposure / leveragedCapital) * 100 : 0;
+      const remainingBuyingPower = Math.max(
+        0,
+        leveragedCapital - grossExposure,
+      );
 
-    // 🧮 Leverage capacity and usage
-    const leveragedCapital = equity * leverage;
-    const leverageUsedPct =
-      leveragedCapital > 0 ? (grossExposure / leveragedCapital) * 100 : 0;
-    const remainingBuyingPower = Math.max(0, leveragedCapital - grossExposure);
+      // 🧮 Portfolio returns
+      const totalReturn = equity - STARTING_CAPITAL;
+      const totalReturnPct = (totalReturn / STARTING_CAPITAL) * 100;
 
-    // 🧮 Portfolio returns
-    const totalReturn = equity - STARTING_CAPITAL;
-    const totalReturnPct = (totalReturn / STARTING_CAPITAL) * 100;
+      const activePositions = positions.filter((p) => p.shares !== 0).length;
+      const winRate = activePositions ? (wins / activePositions) * 100 : 0;
 
-    const activePositions = positions.filter((p) => p.shares !== 0).length;
-    const winRate = activePositions ? (wins / activePositions) * 100 : 0;
-
-    return {
-      totalValue: equity,
-      totalReturn,
-      totalReturnPct,
-      longValue,
-      shortValue,
-      unrealizedPnl,
-      leverageUsedPct,
-      leveragedCapital,
-      remainingBuyingPower,
-      winRate,
-      lastUpdate: lastUpdate ?? new Date(),
-      positionCount: activePositions,
-      cash,
+      return {
+        totalValue: equity,
+        totalReturn,
+        totalReturnPct,
+        longValue,
+        shortValue,
+        unrealizedPnl,
+        leverageUsedPct,
+        leveragedCapital,
+        remainingBuyingPower,
+        winRate,
+        lastUpdate: lastUpdate ?? new Date(),
+        positionCount: activePositions,
+        cash,
+      };
     };
-  };
 
-  useEffect(() => {
-    const calc = calculateMetrics(positions || [], portfolioLeverage);
-    setMetrics(calc);
-  }, [positions, portfolioLeverage]);
-
-  if (!metrics) return <PerformanceSummarySkeleton />;
+    return calculateMetrics(positions || [], portfolioLeverage);
+  }, [positions, portfolioLeverage, livePrices, priceTimestamps]);
 
   // 🧾 Formatting helpers (typed)
   const fmtCurrency = (v: number): string =>
@@ -144,8 +165,7 @@ export function PortfolioPerformanceSummary({
       minimumFractionDigits: 2,
     }).format(v);
 
-  const fmtPct = (v: number): string =>
-    `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+  const fmtPct = (v: number): string => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
 
   const fmtDate = (d: Date): string =>
     new Intl.DateTimeFormat("en-US", {
@@ -164,8 +184,21 @@ export function PortfolioPerformanceSummary({
           <DollarSign className="h-5 w-5" />
           Performance Summary
         </CardTitle>
-        <Badge variant="outline" className="text-xs">
-          Live Prices
+        <Badge
+          variant={priceSource === "websocket" ? "default" : "outline"}
+          className={`text-xs ${priceSource === "websocket" ? "bg-green-600 dark:bg-green-700" : ""}`}
+        >
+          {priceSource === "websocket" ? (
+            <span className="flex items-center gap-1">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-300 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400"></span>
+              </span>
+              Live
+            </span>
+          ) : (
+            "HTTP Prices"
+          )}
         </Badge>
       </CardHeader>
 
@@ -249,10 +282,13 @@ export function PortfolioPerformanceSummary({
                 Leverage Used
               </span>
             </div>
-            <p className="text-xl font-bold">{metrics.leverageUsedPct.toFixed(1)}%</p>
-            <Progress value={metrics.leverageUsedPct} className="h-2 mt-1" />
+            <p className="text-xl font-bold">
+              {metrics.leverageUsedPct.toFixed(1)}%
+            </p>
+            <Progress value={metrics.leverageUsedPct} className="mt-1 h-2" />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Gross Exposure: {fmtCurrency(metrics.longValue + metrics.shortValue)}
+              Gross Exposure:{" "}
+              {fmtCurrency(metrics.longValue + metrics.shortValue)}
             </p>
           </div>
 
@@ -272,10 +308,16 @@ export function PortfolioPerformanceSummary({
           </div>
         </div>
 
-        <div className="mt-2 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-          <Clock className="h-4 w-4 mr-1" />
-          Data last updated: {fmtDate(metrics.lastUpdate)} | Now:{" "}
-          {fmtDate(new Date())}
+        <div className="mt-2 flex items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center">
+            <Clock className="mr-1 h-4 w-4" />
+            <span>Prices updated: {fmtDate(metrics.lastUpdate)}</span>
+          </div>
+          <div className="flex items-center">
+            <span className="text-xs">
+              Source: {priceSource === "websocket" ? "🟢 Live" : "🔵 HTTP"}
+            </span>
+          </div>
         </div>
       </CardContent>
     </Card>

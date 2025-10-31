@@ -27,6 +27,11 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { Skeleton } from "~/components/ui/skeleton";
 
@@ -139,15 +144,22 @@ const columns: ColumnDef<PortfolioPositionWithMetrics>[] = [
 
       return (
         <div className="text-right">
-          <div className="flex items-center justify-end gap-1">
+          <div className="flex items-center justify-end gap-1.5">
             {lastPrice ? formatCurrency(lastPrice) : "—"}
             {priceSource && (
-              <div
-                className={`size-2 rounded-full ${
-                  isLive ? "animate-pulse bg-green-500" : "bg-orange-500"
-                }`}
-                title={isLive ? "Live price" : "Stored price"}
-              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className={cn(
+                      "size-2 cursor-help rounded-full",
+                      isLive ? "animate-pulse bg-green-500" : "bg-orange-500",
+                    )}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{isLive ? "Live" : "Cached"}</p>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
         </div>
@@ -219,6 +231,8 @@ interface PortfolioHoldingsTableProps {
   error?: string | null;
   onRetry?: () => void;
   portfolioName?: string;
+  livePrices?: Record<string, number>;
+  priceSource?: "websocket" | "http";
 }
 
 export function PortfolioHoldingsTable({
@@ -228,13 +242,55 @@ export function PortfolioHoldingsTable({
   error = null,
   onRetry,
   portfolioName = "Portfolio",
+  livePrices,
+  priceSource = "http",
 }: PortfolioHoldingsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "ticker", desc: false }, // Default sort by ticker ascending
   ]);
 
+  // Merge live prices with positions data for accurate real-time P/L calculations
+  // Filter out positions with 0 shares
+  const positionsWithLivePrices = React.useMemo(() => {
+    // Filter out positions with 0 shares first
+    const activePositions = positions.filter(
+      (position) => position.shares !== 0,
+    );
+
+    if (!livePrices || Object.keys(livePrices).length === 0) {
+      return activePositions;
+    }
+
+    return activePositions.map((position) => {
+      const livePrice = livePrices[position.ticker];
+
+      // If we have a live price, recalculate P/L metrics
+      if (livePrice !== undefined && livePrice > 0) {
+        const currentValue = position.shares * livePrice;
+        const costBasis = position.shares * position.avg_cost;
+        const profitLoss = currentValue - costBasis;
+        const profitLossPct =
+          costBasis !== 0 ? (profitLoss / Math.abs(costBasis)) * 100 : 0;
+
+        return {
+          ...position,
+          last_price: livePrice,
+          profit_loss: profitLoss,
+          profit_loss_pct: profitLossPct,
+          price_source: "live" as const,
+        };
+      }
+
+      // Otherwise, use stored price with appropriate indicator
+      return {
+        ...position,
+        price_source: position.last_price ? ("stored" as const) : undefined,
+      };
+    });
+  }, [positions, livePrices]);
+
   const table = useReactTable({
-    data: positions,
+    data: positionsWithLivePrices,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),

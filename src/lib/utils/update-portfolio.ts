@@ -55,18 +55,61 @@ export async function updatePortfolioFromReport({
 
   // 4️⃣ Process each portfolio
   for (const portfolio of portfolios) {
+    const STARTING_EQUITY = 100000;
+    const leverage = portfolio.leverage ?? 1;
+
+    // Compute current gross exposure (sum of |position| * last_price)
+    const existingPositions = await db.portfolioPosition.findMany({
+      where: { portfolioId: portfolio.id },
+    });
+
+    const currentExposure = existingPositions.reduce((sum, p) => {
+      const price = p.last_price ?? 0;
+      return sum + Math.abs(p.shares * price);
+    }, 0);
+
+    const maxExposure = STARTING_EQUITY * leverage;
     const effectiveAllocation = getEffectiveAllocation(
       portfolio.allocation_per_ticker,
       portfolio.tickers.length,
     );
-    const portfolioValue = 100000;
-    const leverage = portfolio.leverage ?? 1;
-    const targetValue = portfolioValue * effectiveAllocation * leverage;
-    const shares = Math.floor(targetValue / price);
+
+    const targetValue = STARTING_EQUITY * effectiveAllocation;
+    const remainingExposure = Math.max(0, maxExposure - currentExposure);
+    const tradableValue = Math.min(targetValue, remainingExposure);
+    const shares = Math.floor(tradableValue / price);
 
     console.log(
-      `Updating portfolio ${portfolio.id} (${portfolio.name}): allocation=${effectiveAllocation}, leverage=${leverage}x, targetValue=${targetValue}, shares=${shares}, action=${action}`,
+      `Updating portfolio ${portfolio.id} (${portfolio.name}): allocation=${effectiveAllocation}, leverage=${leverage}x, tradableValue=${tradableValue.toFixed(
+        2,
+      )}, shares=${shares}, action=${action}`,
     );
+
+    // ⚠️ Skip if no remaining margin or exposure room
+    if (remainingExposure <= 0 || shares <= 0) {
+      console.log(
+        `⛔ Skipped ${action} for ${portfolio.name}: no remaining buying power (remaining=${remainingExposure.toFixed(
+          2,
+        )}, leverage=${leverage}x)`,
+      );
+
+      await db.portfolioAction.create({
+        data: {
+          portfolioId: portfolio.id,
+          session_id: sessionId,
+          ticker: report.ticker,
+          action,
+          trade_type: "SKIPPED_NO_POWER",
+          shares: 0,
+          price_at_action: price,
+          note: `Skipped — no available buying power at ${leverage.toFixed(
+            1,
+          )}× leverage ⚠️`,
+        },
+      });
+
+      continue; // Skip this trade
+    }
 
     // 🟡 Handle HOLD explicitly
     if (action === "HOLD") {
@@ -79,7 +122,7 @@ export async function updatePortfolioFromReport({
           trade_type: "HOLD",
           shares: 0,
           price_at_action: price,
-          note: "Holding steady, no moves today 💎🙌",
+          note: "Holding steady — no trades today 💎🙌",
         },
       });
 
@@ -119,8 +162,9 @@ export async function updatePortfolioFromReport({
     let newShares = pos?.shares ?? 0; // can be negative (short)
     let avgCost = pos?.avg_cost ?? 0;
     let tradeType: string | null = null;
+    let cashDelta = 0;
 
-    // 🟢 SHORT-SUPPORT LOGIC + TRADE TYPE
+    // 🧠 Trade logic
     if (action === "BUY") {
       if (newShares < 0) {
         // Covering short
@@ -128,12 +172,17 @@ export async function updatePortfolioFromReport({
         const coveringShares = Math.min(shares, Math.abs(newShares));
         const realizedPnl = (avgCost - price) * coveringShares;
         console.log(
-          `Covering ${coveringShares} short shares of ${report.ticker}, realized P/L: ${realizedPnl}`,
+          `Covering ${coveringShares} short shares of ${report.ticker}, P/L: ${realizedPnl.toFixed(
+            2,
+          )}`,
         );
+        cashDelta -= price * coveringShares; // buy back shares
         newShares += shares;
         if (newShares > 0) avgCost = price; // flipped to long
       } else {
+        // Buy long
         tradeType = "LONG_BUY";
+        cashDelta -= price * shares;
         avgCost =
           (avgCost * newShares + price * shares) / (newShares + shares || 1);
         newShares += shares;
@@ -145,17 +194,22 @@ export async function updatePortfolioFromReport({
         const sellingShares = Math.min(shares, newShares);
         const realizedPnl = (price - avgCost) * sellingShares;
         console.log(
-          `Sold ${sellingShares} long shares of ${report.ticker}, realized P/L: ${realizedPnl}`,
+          `Sold ${sellingShares} long shares of ${report.ticker}, P/L: ${realizedPnl.toFixed(
+            2,
+          )}`,
         );
+        cashDelta += price * sellingShares;
         newShares -= shares;
       } else if (newShares === 0) {
-        // Opening a short
+        // Opening new short
         tradeType = "SHORT_OPEN";
         avgCost = price;
         newShares = -shares;
+        cashDelta += price * shares; // proceeds from short sale
       } else {
-        // Increasing existing short
+        // Adding to short
         tradeType = "SHORT_ADD";
+        cashDelta += price * shares;
         avgCost =
           (avgCost * Math.abs(newShares) + price * shares) /
           (Math.abs(newShares) + shares || 1);
@@ -163,29 +217,32 @@ export async function updatePortfolioFromReport({
       }
     }
 
-    // Record portfolio action
+    // 💬 Generate readable trade note
     const getNoteForTrade = (
       type: string | null,
       shareCount: number,
       tradePrice: number,
+      leverage: number,
     ): string => {
       const absShares = Math.abs(shareCount);
+      const base = `${absShares} shares @ $${tradePrice.toFixed(2)}`;
       switch (type) {
         case "LONG_BUY":
-          return `Bought ${absShares} shares @ $${tradePrice} 📈`;
+          return `Bought ${base} (using ${leverage.toFixed(1)}× leverage) 📈`;
         case "LONG_SELL":
-          return `Sold ${absShares} shares @ $${tradePrice} 💰`;
+          return `Sold ${base} 💰`;
         case "SHORT_OPEN":
-          return `Opened short ${absShares} shares @ $${tradePrice} 🐻`;
+          return `Opened short ${base} (leveraged ${leverage.toFixed(1)}×) 🐻`;
         case "SHORT_ADD":
-          return `Added to short ${absShares} shares @ $${tradePrice} 📉`;
+          return `Added to short ${base} 📉`;
         case "SHORT_COVER":
-          return `Covered ${absShares} shares @ $${tradePrice} 🔄`;
+          return `Covered ${base} 🔄`;
         default:
-          return `Executed ${type} ${absShares} shares @ $${tradePrice}`;
+          return `Executed ${type ?? "TRADE"} ${base}`;
       }
     };
 
+    // 6️⃣ Record portfolio action
     await db.portfolioAction.create({
       data: {
         portfolioId: portfolio.id,
@@ -195,11 +252,11 @@ export async function updatePortfolioFromReport({
         trade_type: tradeType,
         shares: action === "SELL" ? -shares : shares,
         price_at_action: price,
-        note: getNoteForTrade(tradeType, shares, price),
+        note: getNoteForTrade(tradeType, shares, price, leverage),
       },
     });
 
-    // Update position
+    // 7️⃣ Update / upsert portfolio position
     await db.portfolioPosition.upsert({
       where: {
         portfolioId_ticker: {
@@ -223,7 +280,9 @@ export async function updatePortfolioFromReport({
     });
 
     console.log(
-      `Updated position for ${portfolio.name}: ${newShares} shares @ avg ${avgCost}`,
+      `✅ Updated ${portfolio.name}: ${newShares} shares @ avg ${avgCost.toFixed(
+        2,
+      )}, cash Δ ${cashDelta.toFixed(2)}`,
     );
   }
 
