@@ -65,7 +65,7 @@ export const filterTickerOptions = (
   tickerOptions: TickerOption[],
   searchQuery: string,
   tickerData: Record<string, string>,
-  maxResults: number = 50
+  maxResults = 50
 ): FilteredTickerResults => {
   if (!searchQuery.trim()) {
     // When no search, show popular tickers + limited recent options
@@ -128,7 +128,7 @@ export const filterTickerOptions = (
 /**
  * Truncate ticker name for display purposes
  */
-export const truncateTickerName = (name: string, maxLength: number = 40): string => {
+export const truncateTickerName = (name: string, maxLength = 40): string => {
   if (!name) return name;
   return name.length > maxLength ? `${name.substring(0, maxLength)}...` : name;
 };
@@ -136,7 +136,7 @@ export const truncateTickerName = (name: string, maxLength: number = 40): string
 /**
  * Format ticker display with name truncation
  */
-export const formatTickerDisplay = (ticker: string, name: string, maxNameLength: number = 25): string => {
+export const formatTickerDisplay = (ticker: string, name: string, maxNameLength = 25): string => {
   if (!name) return ticker;
   const truncatedName = truncateTickerName(name, maxNameLength);
   return `${ticker} - ${truncatedName}`;

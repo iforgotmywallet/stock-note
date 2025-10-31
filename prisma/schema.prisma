@@ -167,6 +167,7 @@ model Portfolio {
   days_of_week          String[] // e.g. ["monday","wednesday","friday"]
   allocation_per_ticker Float                 @default(0.20)
   enabled               Boolean               @default(true)
+  leverage              Float                 @default(1.0)
   created_at            DateTime              @default(now())
   updated_at            DateTime              @default(now())
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -190,9 +191,10 @@ model PortfolioAction {
   ticker          String
   action_date     DateTime       @default(now())
   action          String // "BUY" | "SELL" | "HOLD"
+  trade_type      String? // LONG_BUY | LONG_SELL | SHORT_OPEN | SHORT_ADD | SHORT_COVER | HOLD
   price_at_action Float
   shares          Float
-  note            String?        // Optional note for the action
+  note            String? // Optional note for the action
   created_at      DateTime       @default(now())
   portfolio       Portfolio      @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   agent_report    agent_reports? @relation(fields: [session_id], references: [session_id])

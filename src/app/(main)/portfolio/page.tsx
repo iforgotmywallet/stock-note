@@ -14,6 +14,7 @@ interface Portfolio {
   days_of_week: string[];
   allocation_per_ticker: number;
   enabled: boolean;
+  leverage: number;
   created_at: Date;
   tickers: { ticker: string }[];
 }

@@ -7,7 +7,7 @@ export async function updatePortfolioFromReport({
 }: {
   sessionId: string;
 }) {
-  // Fetch the finished analysis report
+  // 1️⃣ Fetch finished analysis report
   const report = await db.agent_reports.findUnique({
     where: { session_id: sessionId },
     select: {
@@ -19,9 +19,9 @@ export async function updatePortfolioFromReport({
     },
   });
 
-  if (!report || !report.recommendation || !report.price) return;
+  if (!report?.recommendation || !report.price) return;
 
-  // Safeguard: Only allow admin-triggered analyses
+  // 2️⃣ Only allow admin-triggered analysis
   if (report.userId !== env.ADMIN_USER_SECRET_ID) {
     console.log(
       `Portfolio update skipped - not admin triggered (userId: ${report.userId})`,
@@ -39,7 +39,7 @@ export async function updatePortfolioFromReport({
     `Portfolio update for ${report.ticker}: action=${action}, price=${price}, today=${today}`,
   );
 
-  // Find all portfolios that contain this ticker and are active today
+  // 3️⃣ Find all portfolios containing this ticker and active today
   const portfolios = await db.portfolio.findMany({
     where: {
       enabled: true,
@@ -53,21 +53,22 @@ export async function updatePortfolioFromReport({
     `Found ${portfolios.length} portfolios to update for ticker ${report.ticker} on ${today}`,
   );
 
+  // 4️⃣ Process each portfolio
   for (const portfolio of portfolios) {
-    //Using Effective Allocation to avoid over flow of percentage
     const effectiveAllocation = getEffectiveAllocation(
       portfolio.allocation_per_ticker,
       portfolio.tickers.length,
     );
     const portfolioValue = 100000;
-    const targetValue = portfolioValue * effectiveAllocation;
+    const leverage = portfolio.leverage ?? 1;
+    const targetValue = portfolioValue * effectiveAllocation * leverage;
     const shares = Math.floor(targetValue / price);
 
     console.log(
-      `Updating portfolio ${portfolio.id} (${portfolio.name}): allocation=${effectiveAllocation}, shares=${shares}, action=${action}`,
+      `Updating portfolio ${portfolio.id} (${portfolio.name}): allocation=${effectiveAllocation}, leverage=${leverage}x, targetValue=${targetValue}, shares=${shares}, action=${action}`,
     );
 
-    // Handle HOLD explicitly
+    // 🟡 Handle HOLD explicitly
     if (action === "HOLD") {
       await db.portfolioAction.create({
         data: {
@@ -75,17 +76,13 @@ export async function updatePortfolioFromReport({
           session_id: sessionId,
           ticker: report.ticker,
           action: "HOLD",
+          trade_type: "HOLD",
           shares: 0,
           price_at_action: price,
-          note: "AI decided to hold current position today",
+          note: "Holding steady, no moves today 💎🙌",
         },
       });
 
-      console.log(
-        `Logged HOLD action for ${portfolio.name}: holding ${report.ticker} at ${price}`,
-      );
-
-      // Just update last known price for position (no trade)
       await db.portfolioPosition.upsert({
         where: {
           portfolioId_ticker: {
@@ -106,27 +103,10 @@ export async function updatePortfolioFromReport({
         },
       });
 
-      continue; // move on to next ticker
+      continue;
     }
 
-    // BUY or SELL below
-    await db.portfolioAction.create({
-      data: {
-        portfolioId: portfolio.id,
-        session_id: sessionId,
-        ticker: report.ticker,
-        action,
-        shares: action === "SELL" ? -shares : shares,
-        price_at_action: price,
-        note: `AI recommended ${action.toLowerCase()} ${Math.abs(shares)} shares at $${price}`,
-      },
-    });
-
-    console.log(
-      `Created ${action} action for ${portfolio.name}: ${shares} shares of ${report.ticker}`,
-    );
-
-    // Update or insert position
+    // 5️⃣ Fetch existing position
     const pos = await db.portfolioPosition.findUnique({
       where: {
         portfolioId_ticker: {
@@ -136,16 +116,90 @@ export async function updatePortfolioFromReport({
       },
     });
 
-    let newShares = pos?.shares ?? 0;
+    let newShares = pos?.shares ?? 0; // can be negative (short)
     let avgCost = pos?.avg_cost ?? 0;
+    let tradeType: string | null = null;
 
+    // 🟢 SHORT-SUPPORT LOGIC + TRADE TYPE
     if (action === "BUY") {
-      avgCost = (avgCost * newShares + price * shares) / (newShares + shares);
-      newShares += shares;
+      if (newShares < 0) {
+        // Covering short
+        tradeType = "SHORT_COVER";
+        const coveringShares = Math.min(shares, Math.abs(newShares));
+        const realizedPnl = (avgCost - price) * coveringShares;
+        console.log(
+          `Covering ${coveringShares} short shares of ${report.ticker}, realized P/L: ${realizedPnl}`,
+        );
+        newShares += shares;
+        if (newShares > 0) avgCost = price; // flipped to long
+      } else {
+        tradeType = "LONG_BUY";
+        avgCost =
+          (avgCost * newShares + price * shares) / (newShares + shares || 1);
+        newShares += shares;
+      }
     } else if (action === "SELL") {
-      newShares -= Math.abs(shares);
+      if (newShares > 0) {
+        // Selling long
+        tradeType = "LONG_SELL";
+        const sellingShares = Math.min(shares, newShares);
+        const realizedPnl = (price - avgCost) * sellingShares;
+        console.log(
+          `Sold ${sellingShares} long shares of ${report.ticker}, realized P/L: ${realizedPnl}`,
+        );
+        newShares -= shares;
+      } else if (newShares === 0) {
+        // Opening a short
+        tradeType = "SHORT_OPEN";
+        avgCost = price;
+        newShares = -shares;
+      } else {
+        // Increasing existing short
+        tradeType = "SHORT_ADD";
+        avgCost =
+          (avgCost * Math.abs(newShares) + price * shares) /
+          (Math.abs(newShares) + shares || 1);
+        newShares -= shares;
+      }
     }
 
+    // Record portfolio action
+    const getNoteForTrade = (
+      type: string | null,
+      shareCount: number,
+      tradePrice: number,
+    ): string => {
+      const absShares = Math.abs(shareCount);
+      switch (type) {
+        case "LONG_BUY":
+          return `Bought ${absShares} shares @ $${tradePrice} 📈`;
+        case "LONG_SELL":
+          return `Sold ${absShares} shares @ $${tradePrice} 💰`;
+        case "SHORT_OPEN":
+          return `Opened short ${absShares} shares @ $${tradePrice} 🐻`;
+        case "SHORT_ADD":
+          return `Added to short ${absShares} shares @ $${tradePrice} 📉`;
+        case "SHORT_COVER":
+          return `Covered ${absShares} shares @ $${tradePrice} 🔄`;
+        default:
+          return `Executed ${type} ${absShares} shares @ $${tradePrice}`;
+      }
+    };
+
+    await db.portfolioAction.create({
+      data: {
+        portfolioId: portfolio.id,
+        session_id: sessionId,
+        ticker: report.ticker,
+        action,
+        trade_type: tradeType,
+        shares: action === "SELL" ? -shares : shares,
+        price_at_action: price,
+        note: getNoteForTrade(tradeType, shares, price),
+      },
+    });
+
+    // Update position
     await db.portfolioPosition.upsert({
       where: {
         portfolioId_ticker: {
@@ -169,7 +223,7 @@ export async function updatePortfolioFromReport({
     });
 
     console.log(
-      `Updated position for ${portfolio.name}: ${newShares} shares at avg ${avgCost}`,
+      `Updated position for ${portfolio.name}: ${newShares} shares @ avg ${avgCost}`,
     );
   }
 

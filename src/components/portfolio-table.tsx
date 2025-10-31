@@ -8,6 +8,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import { IconBriefcase, IconCheck, IconX } from "@tabler/icons-react"
+import { useRouter } from "next/navigation"
 
 import { Badge } from "~/components/ui/badge"
 import {
@@ -27,6 +28,7 @@ export interface Portfolio {
   days_of_week: string[];
   allocation_per_ticker: number;
   enabled: boolean;
+  leverage: number;
   created_at: Date;
   tickers: { ticker: string }[];
 }
@@ -134,7 +136,7 @@ const columns: ColumnDef<Portfolio>[] = [
             )}
           </div>
           <div className="text-xs text-muted-foreground">
-            {(allocation * 100).toFixed(0)}% per ticker
+            {(allocation * 100).toFixed(0)}% per ticker • {row.original.leverage.toFixed(1)}x leverage
           </div>
         </div>
       )
@@ -147,11 +149,17 @@ interface PortfolioTableProps {
 }
 
 export function PortfolioTable({ portfolios }: PortfolioTableProps) {
+  const router = useRouter()
+  
   const table = useReactTable({
     data: portfolios,
     columns,
     getCoreRowModel: getCoreRowModel(),
   })
+
+  const handleRowClick = (portfolioId: string) => {
+    router.push(`/portfolio/${portfolioId}/dashboard`)
+  }
 
   if (portfolios.length === 0) {
     return (
@@ -205,7 +213,20 @@ export function PortfolioTable({ portfolios }: PortfolioTableProps) {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow 
+                key={row.id}
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => handleRowClick(row.original.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleRowClick(row.original.id)
+                  }
+                }}
+                aria-label={`View dashboard for ${row.original.name} portfolio`}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="align-top">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

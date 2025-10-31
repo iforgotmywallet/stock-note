@@ -62,7 +62,7 @@ import {
 import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 import {
-  GPTModel,
+  type GPTModel,
   GPT_MODELS,
   DEFAULT_GPT_MODEL,
   getGPTModelConfig,

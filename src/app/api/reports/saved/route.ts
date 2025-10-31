@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { AgentReportsService } from "~/lib/database/agent-reports";
 import { auth } from "~/lib/auth";
 

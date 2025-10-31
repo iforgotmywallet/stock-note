@@ -520,7 +520,7 @@ export function validateChatMessage(message: string): { isValid: boolean; error?
   return { isValid: true };
 }
 
-export function validateReportSelection(selectedReports: unknown[], maxReports: number = 5): { isValid: boolean; error?: string } {
+export function validateReportSelection(selectedReports: unknown[], maxReports = 5): { isValid: boolean; error?: string } {
   if (!Array.isArray(selectedReports)) {
     return { isValid: false, error: "Invalid report selection format" };
   }

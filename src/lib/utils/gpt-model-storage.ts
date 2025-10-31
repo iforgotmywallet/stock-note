@@ -5,7 +5,7 @@
  * in localStorage across chat sessions.
  */
 
-import { GPTModel, DEFAULT_GPT_MODEL, isValidGPTModel } from '~/types/gpt-models';
+import { type GPTModel, DEFAULT_GPT_MODEL, isValidGPTModel } from '~/types/gpt-models';
 
 // localStorage key for GPT model preference
 const GPT_MODEL_STORAGE_KEY = 'enhanced-chat-gpt-model';

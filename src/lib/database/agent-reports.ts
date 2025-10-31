@@ -296,7 +296,7 @@ export class AgentReportsService {
 
       return recentEntries
         .filter((entry) => entry.report) // Filter out any entries without reports
-        .map((entry) => this.transformToSidebarItem(entry.report!));
+        .map((entry) => this.transformToSidebarItem(entry.report));
     } catch (error) {
       console.error("Error fetching recent reports for sidebar:", error);
       throw new Error("Failed to fetch recent reports for sidebar");
@@ -345,7 +345,7 @@ export class AgentReportsService {
 
       return savedEntries
         .filter((entry) => entry.report) // Filter out any entries without reports
-        .map((entry) => this.transformToSidebarItem(entry.report!));
+        .map((entry) => this.transformToSidebarItem(entry.report));
     } catch (error) {
       console.error("Error fetching saved reports for sidebar:", error);
       throw new Error("Failed to fetch saved reports for sidebar");
@@ -444,7 +444,7 @@ export class AgentReportsService {
       });
 
       // If no report found, user doesn't own it, or it's not published
-      if (!report || !report.published) {
+      if (!report?.published) {
         return null;
       }
 

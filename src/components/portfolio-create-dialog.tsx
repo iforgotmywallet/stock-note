@@ -49,6 +49,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
     days_of_week: [],
     allocation_per_ticker: 0.1, // Default to 10%
     enabled: true,
+    leverage: 1.0, // Default to 1x leverage
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -84,6 +85,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
         days_of_week: [],
         allocation_per_ticker: 0.1,
         enabled: true,
+        leverage: 1.0,
       });
       setErrors({});
       setIsSubmitting(false);
@@ -95,7 +97,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
     const newErrors: Record<string, string> = {};
 
     // Validate portfolio name
-    if (!formData.name || !formData.name.trim()) {
+    if (!formData.name?.trim()) {
       newErrors.name = "Portfolio name is required";
     } else if (formData.name.trim().length < 2) {
       newErrors.name = "Portfolio name must be at least 2 characters long";
@@ -111,10 +113,10 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
     }
 
     // Validate tickers
-    if (!formData.tickers || formData.tickers.length === 0) {
+    if (formData.tickers?.length === 0) {
       newErrors.tickers = "At least one ticker is required";
-    } else if (formData.tickers.length > 20) {
-      newErrors.tickers = "Maximum 20 tickers allowed per portfolio";
+    } else if (formData.tickers.length > 5) {
+      newErrors.tickers = "Maximum 5 tickers allowed per portfolio";
     } else {
       // Validate individual tickers
       const invalidTickers: string[] = [];
@@ -151,7 +153,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
     }
 
     // Validate days of week
-    if (!formData.days_of_week || formData.days_of_week.length === 0) {
+    if (formData.days_of_week?.length === 0) {
       newErrors.days_of_week = "At least one trading day is required";
     } else {
       const validDays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
@@ -175,6 +177,15 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
     // Validate enabled status
     if (typeof formData.enabled !== "boolean") {
       newErrors.enabled = "Portfolio status must be specified";
+    }
+
+    // Validate leverage
+    if (typeof formData.leverage !== "number") {
+      newErrors.leverage = "Leverage must be a valid number";
+    } else if (formData.leverage < 1.0) {
+      newErrors.leverage = "Leverage must be at least 1.0x";
+    } else if (formData.leverage > 5.0) {
+      newErrors.leverage = "Leverage cannot exceed 5.0x";
     }
 
     setErrors(newErrors);
@@ -288,14 +299,11 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         
         <DialogHeader>
-          <DialogTitle className="text-lg leading-none font-semibold mb-2">
-            Create New Portfolio
-          </DialogTitle>
-          <DialogDescription className="text-muted-foreground text-sm mb-4"
-          >
+          <DialogTitle>Create New Portfolio</DialogTitle>
+          <DialogDescription>
             Set up a new investment portfolio with your preferred tickers, trading days, and allocation strategy.
           </DialogDescription>
         </DialogHeader>
@@ -313,9 +321,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
 
           <form 
             onSubmit={handleSubmit} 
-            className="space-y-4 sm:space-y-6"
-            aria-labelledby="portfolio-dialog-title"
-            aria-describedby="portfolio-dialog-description"
+            className="space-y-6"
           >
           {/* General Error */}
           {errors.general && (
@@ -397,7 +403,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
 
           {/* Ticker Selection */}
           <div className="space-y-2">
-            <Label id="tickers-label">Tickers * (max 20)</Label>
+            <Label id="tickers-label">Tickers * (max 5)</Label>
             <PortfolioTickerSelector
               selectedTickers={formData.tickers}
               onTickersChange={(tickers) => {
@@ -412,13 +418,17 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
               }}
               disabled={isSubmitting || isLoadingTickers}
               placeholder={isLoadingTickers ? "Loading ticker data..." : "Select stock tickers for your portfolio"}
+              maxSelections={5}
               aria-labelledby="tickers-label"
               aria-describedby={errors.tickers ? "tickers-error" : "tickers-count"}
               aria-invalid={!!errors.tickers}
             />
             <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-xs text-muted-foreground">
               <span id="tickers-count" aria-live="polite">
-                {formData.tickers.length}/20 tickers selected
+                {formData.tickers.length}/5 tickers selected
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Limited to 5 tickers for better trading concentration
               </span>
               {isLoadingTickers && (
                 <span aria-live="polite">Loading validation data...</span>
@@ -564,6 +574,53 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
             )}
           </div>
 
+          {/* Leverage */}
+          <div className="space-y-3">
+            <Label htmlFor="leverage-slider">
+              Leverage: {formData.leverage.toFixed(1)}x
+            </Label>
+            <Slider
+              id="leverage-slider"
+              value={[formData.leverage]}
+              onValueChange={(values) => {
+                const value = values[0];
+                if (value !== undefined) {
+                  setFormData(prev => ({ ...prev, leverage: value }));
+                  // Clear leverage error when user changes value
+                  if (errors.leverage) {
+                    setErrors(prev => {
+                      const { leverage, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }
+              }}
+              min={1.0}
+              max={5.0}
+              step={0.1}
+              disabled={isSubmitting}
+              className="w-full"
+              aria-label={`Leverage: ${formData.leverage.toFixed(1)}x`}
+              aria-describedby={errors.leverage ? "leverage-error" : "leverage-info"}
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>1.0x</span>
+              <span>5.0x</span>
+            </div>
+            
+            <div id="leverage-info" className="text-xs text-muted-foreground">
+              <span className="font-medium">Leverage multiplies your buying power.</span>
+              <br />
+              Higher leverage increases both potential gains and losses.
+            </div>
+            
+            {errors.leverage && (
+              <p id="leverage-error" className="text-sm text-destructive" role="alert">
+                {errors.leverage}
+              </p>
+            )}
+          </div>
+
           {/* Enable Portfolio */}
           <div className="flex items-center space-x-2">
             <Switch
@@ -579,20 +636,18 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
             </span>
           </div>
 
-          <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
-              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting || isLoadingTickers || Object.values(errors).some(error => error && error.trim())}
-              className="min-w-[140px] w-full sm:w-auto"
               aria-describedby={isSubmitting ? "submit-status" : undefined}
             >
               {isSubmitting ? (
@@ -605,7 +660,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
               )}
             </Button>
           </DialogFooter>
-        </form>
+          </form>
         </div>
       </DialogContent>
     </Dialog>

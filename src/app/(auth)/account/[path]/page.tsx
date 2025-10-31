@@ -27,7 +27,7 @@ export default async function AccountPage({ params }: { params: Promise<{ path: 
         <main className="container p-4 md:p-6">
             {path === "settings" && (
                 <div className="mb-6">
-                    <BackButton href="/" label="Back to Home" />
+                    <BackButton href="/" label="Back to Home" useBrowserHistory={true} />
                 </div>
             )}
             <AccountView path={path} />

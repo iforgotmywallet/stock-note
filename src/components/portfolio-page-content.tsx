@@ -28,11 +28,10 @@ export function PortfolioPageContent({ portfolios: initialPortfolios }: Portfoli
   };
 
   return (
-    <div className="container mx-auto px-4 md:px-6">
+    <div className="container mx-auto px-4 py-6 md:px-6">
       {/* Page Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <IconBriefcase className="size-8 text-primary" aria-hidden="true" />
           <div>
             <h1 className="text-xl sm:text-2xl font-bold">Portfolio Management</h1>
             <p className="text-sm sm:text-base text-muted-foreground">

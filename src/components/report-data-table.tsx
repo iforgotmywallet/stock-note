@@ -147,7 +147,7 @@ interface ReportDataTableProps {
 const createColumns = (
   onTogglePublish: (id: string, ticker: string, published: boolean) => void,
   onDelete: (id: string, ticker: string) => void,
-  showIdColumn: boolean = false,
+  showIdColumn = false,
 ): ColumnDef<AgentReportRow>[] => {
   const columns: ColumnDef<AgentReportRow>[] = [
     {
@@ -261,8 +261,7 @@ const createColumns = (
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const config =
-          statusConfig[row.original.status as keyof typeof statusConfig];
+        const config = statusConfig[row.original.status];
 
         // Fallback for unknown status
         if (!config) {
@@ -295,12 +294,8 @@ const createColumns = (
           NEC: 3,
           done: 4,
         };
-        const priorityA =
-          statusPriority[rowA.original.status as keyof typeof statusPriority] ??
-          999;
-        const priorityB =
-          statusPriority[rowB.original.status as keyof typeof statusPriority] ??
-          999;
+        const priorityA = statusPriority[rowA.original.status] ?? 999;
+        const priorityB = statusPriority[rowB.original.status] ?? 999;
         return priorityA - priorityB;
       },
     },
@@ -359,7 +354,9 @@ const createColumns = (
             {(() => {
               // Create a new date treating the database date as local time to avoid timezone shift
               const date = new Date(row.original.analysisDate);
-              const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+              const localDate = new Date(
+                date.getTime() + date.getTimezoneOffset() * 60000,
+              );
               return localDate.toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -456,9 +453,7 @@ const createColumns = (
         // Handle case where recommendation exists
         if (recommendation && recommendation.trim() !== "") {
           return (
-            <Link
-              href={`/document/${row.original.sessionId}`}
-            >
+            <Link href={`/document/${row.original.sessionId}`}>
               <div className="pl-4">
                 <Badge
                   variant="outline"
@@ -481,8 +476,12 @@ const createColumns = (
       },
       enableSorting: false,
       filterFn: (row, id, value) => {
-        const recommendation = row.getValue(id) as string;
-        if (!recommendation || recommendation.trim() === "") {
+        const recommendation = row.getValue(id);
+        if (
+          !recommendation ||
+          typeof recommendation !== "string" ||
+          recommendation.trim() === ""
+        ) {
           return false; // Don't show rows without recommendations in filter results
         }
         return recommendation === value; // Exact match for database values
@@ -881,8 +880,6 @@ export function ReportDataTable({
     handleBulkDeleteConfirmed,
   ]);
 
-
-
   // Simple, lightweight row click handler
   const handleRowClick = React.useCallback(
     (sessionId: string, event: React.MouseEvent) => {
@@ -1039,7 +1036,7 @@ export function ReportDataTable({
       >
         <div className="flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">Analysis Reports</h2>
+            <h2 className="text-xl font-bold sm:text-2xl">Analysis Reports</h2>
           </div>
         </div>
         <div className="flex h-32 items-center justify-center">
@@ -1059,7 +1056,7 @@ export function ReportDataTable({
       >
         <div className="flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">Analysis Reports</h2>
+            <h2 className="text-xl font-bold sm:text-2xl">Analysis Reports</h2>
           </div>
           <Button variant="outline" size="sm" onClick={handleRefresh}>
             <IconRefresh />
@@ -1080,7 +1077,7 @@ export function ReportDataTable({
     >
       <div className="flex items-center justify-between px-4 lg:px-6">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">Analysis Reports 📖</h2>
+          <h2 className="text-xl font-bold sm:text-2xl">Analysis Reports 📖</h2>
           <Button
             variant="ghost"
             size="sm"

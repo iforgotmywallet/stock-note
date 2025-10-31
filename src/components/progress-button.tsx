@@ -35,7 +35,7 @@ export function ProgressButton({ reportId, ticker, className }: ProgressButtonPr
     const response_data = await response.json()
     
     // Validate the response wrapper structure
-    if (!response_data || !response_data.success || !response_data.data) {
+    if (!response_data?.success || !response_data.data) {
       throw new Error('Invalid response format received')
     }
 

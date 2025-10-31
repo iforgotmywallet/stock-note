@@ -128,8 +128,7 @@ export function ProgressPopover({
     setIsOpen(open)
     if (open && !isLoading) {
       // Check if we need to fetch fresh data
-      const shouldFetch = !progressData || 
-        !progressData.cachedAt || 
+      const shouldFetch = !progressData?.cachedAt || 
         (Date.now() - progressData.cachedAt.getTime()) > cacheTimeMs
       
       if (shouldFetch) {

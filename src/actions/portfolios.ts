@@ -13,6 +13,7 @@ export interface CreatePortfolioFormData {
   days_of_week: string[];
   allocation_per_ticker: number;
   enabled: boolean;
+  leverage: number;
 }
 
 export interface CreatePortfolioResult {
@@ -66,6 +67,7 @@ export async function createPortfolio(formData: CreatePortfolioFormData): Promis
       days_of_week: formData.days_of_week.map(day => day.toLowerCase()),
       allocation_per_ticker: effectiveAllocation, // Store the effective allocation
       enabled: formData.enabled,
+      leverage: formData.leverage,
     };
 
     // Create portfolio using database service
@@ -314,6 +316,23 @@ function validatePortfolioFormData(formData: CreatePortfolioFormData): { isValid
   // Validate enabled status
   if (typeof formData.enabled !== "boolean") {
     return { isValid: false, error: "Portfolio enabled status must be specified as true or false" };
+  }
+
+  // Validate leverage
+  if (typeof formData.leverage !== "number") {
+    return { isValid: false, error: "Leverage must be a valid number" };
+  }
+
+  if (isNaN(formData.leverage)) {
+    return { isValid: false, error: "Leverage is not a valid number" };
+  }
+
+  if (formData.leverage < 1.0) {
+    return { isValid: false, error: "Leverage must be at least 1.0x" };
+  }
+
+  if (formData.leverage > 5.0) {
+    return { isValid: false, error: "Leverage cannot exceed 5.0x" };
   }
 
   return { isValid: true };

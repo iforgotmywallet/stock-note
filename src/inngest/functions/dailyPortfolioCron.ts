@@ -40,8 +40,6 @@ export const dailyPortfolioCron = inngest.createFunction(
           );
         }
 
-
-
         // Get unique tickers from all portfolios
         const uniqueTickers = new Set<string>();
         for (const portfolio of portfolios) {
@@ -60,14 +58,18 @@ export const dailyPortfolioCron = inngest.createFunction(
             const sessionId = generateSessionId(ticker, todayDate);
 
             // Create queued report for admin user
-            const createdReport = await AgentReportsService.createQueuedReport({
+            await AgentReportsService.createQueuedReport({
               sessionId,
               ticker,
               analysisDate: new Date(todayDate),
-              userId: env.ADMIN_USER_SECRET_ID,
+              userId: adminUser.id,
               published: false,
-              analystTeams: ["market", "social"],
+              analystTeams: ["market", "social"], // Required parameter
             });
+
+            console.log(
+              `Created queued report for ${ticker} with session ID: ${sessionId}`,
+            );
 
             // Store the mapping
             tickerToSessionId.set(ticker, sessionId);
@@ -91,7 +93,6 @@ export const dailyPortfolioCron = inngest.createFunction(
 
       for (const [ticker, sessionId] of Object.entries(tickerSessionMap)) {
         try {
-
           await inngest.send({
             name: "generate-analysis-event",
             data: {

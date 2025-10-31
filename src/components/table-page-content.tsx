@@ -8,7 +8,7 @@ interface TablePageContentProps {
 
 export default function TablePageContent({ userId }: TablePageContentProps) {
   return (
-    <div className="container mx-auto">
+    <div className="container mx-auto p-6">
       <ReportDataTable 
         userId={userId}
         className="w-full"

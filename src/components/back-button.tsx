@@ -8,19 +8,25 @@ interface BackButtonProps {
   href?: string;
   label?: string;
   onClick?: () => void;
+  useBrowserHistory?: boolean;
 }
 
 export function BackButton({ 
   href = "/", 
   label = "Back", 
-  onClick 
+  onClick,
+  useBrowserHistory = true
 }: BackButtonProps) {
   const router = useRouter();
 
   const handleClick = () => {
     if (onClick) {
       onClick();
+    } else if (useBrowserHistory && window.history.length > 1) {
+      // Use browser history to go back to previous page
+      router.back();
     } else {
+      // Fallback to specified href if no history or useBrowserHistory is false
       router.push(href);
     }
   };

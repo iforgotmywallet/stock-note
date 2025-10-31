@@ -86,7 +86,7 @@ export class OpenAIService {
    * Build context from selected reports for OpenAI with smart truncation
    */
   buildChatContext(reports: SelectedReport[], model: GPTModel = DEFAULT_GPT_MODEL): string {
-    if (!reports || reports.length === 0) {
+    if (reports?.length === 0) {
       return "";
     }
 
@@ -317,10 +317,10 @@ export class OpenAIService {
 
       if (error.message.includes("Context is too large")) {
         // Extract the excess tokens and model name from the error message if available
-        const tokenMatch = error.message.match(/by approximately (\d+) tokens/);
-        const modelMatch = error.message.match(/for (GPT-[^.]+)/);
-        const excessTokens = tokenMatch && tokenMatch[1] ? parseInt(tokenMatch[1], 10) : 0;
-        const modelName = modelMatch && modelMatch[1] ? modelMatch[1] : "the selected model";
+        const tokenMatch = /by approximately (\d+) tokens/.exec(error.message);
+        const modelMatch = /for (GPT-[^.]+)/.exec(error.message);
+        const excessTokens = tokenMatch?.[1] ? parseInt(tokenMatch[1], 10) : 0;
+        const modelName = modelMatch?.[1] ? modelMatch[1] : "the selected model";
 
         let helpfulMessage =
           `The selected reports and message are too large for ${modelName}. `;

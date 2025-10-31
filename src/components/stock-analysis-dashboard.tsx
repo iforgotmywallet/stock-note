@@ -96,7 +96,7 @@ export function StockAnalysisDashboard({
           if (response.ok) {
             const apiResponse = await response.json();
             const data = apiResponse.data || apiResponse;
-            if (data && data.percentage !== undefined) {
+            if (data?.percentage !== undefined) {
               setProgressData(data);
             }
           }
@@ -210,8 +210,7 @@ export function StockAnalysisDashboard({
                       {isLoadingProgress && <Spinner className="size-4" />}
                     </div>
 
-                    {progressData &&
-                    progressData.percentage !== undefined &&
+                    {progressData?.percentage !== undefined &&
                     progressData.populatedColumns &&
                     progressData.totalColumns !== undefined ? (
                       <div className="space-y-2">
