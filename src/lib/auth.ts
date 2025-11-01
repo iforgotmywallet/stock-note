@@ -11,6 +11,9 @@ const polarClient = new Polar({
 });
 
 export const auth = betterAuth({
+  trustedOrigins: [
+    "https://stock-note-ten.vercel.app"
+  ],
   database: prismaAdapter(db, {
     provider: "postgresql",
   }),
