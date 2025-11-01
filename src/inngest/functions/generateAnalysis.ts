@@ -402,7 +402,10 @@ export const generateAnalysis = inngest.createFunction(
     console.log(
       `Analysis service response: ${response.status} ${response.statusText}`,
     );
-    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+    console.log(
+      "Response headers:",
+      Object.fromEntries(response.headers.entries()),
+    );
 
     // Parse and validate response
     let result;
@@ -410,7 +413,7 @@ export const generateAnalysis = inngest.createFunction(
       // First get the raw response text for debugging
       const responseText = await response.text();
       console.log("Raw response text:", responseText.substring(0, 500)); // Log first 500 chars
-      
+
       // Try to parse as JSON
       result = JSON.parse(responseText);
       console.log("Parsed response:", JSON.stringify(result, null, 2));

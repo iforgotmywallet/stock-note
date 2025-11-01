@@ -28,6 +28,7 @@ interface PerformanceSummaryProps {
   portfolioLeverage?: number; // e.g., 4.0
   livePrices?: Record<string, number>; // ticker -> live price from WebSocket
   priceTimestamps?: Record<string, number>; // ticker -> timestamp of last update
+  isWebSocketConnected?: boolean; // Whether WebSocket is actively connected
 }
 
 interface PerformanceMetrics {
@@ -51,11 +52,12 @@ export function PortfolioPerformanceSummary({
   portfolioLeverage = 1.0,
   livePrices,
   priceTimestamps,
+  isWebSocketConnected = false,
 }: PerformanceSummaryProps) {
   const STARTING_CAPITAL = 100_000;
 
-  // Determine if we're using live prices
-  const usingLivePrices = livePrices && Object.keys(livePrices).length > 0;
+  // Determine if we're using live prices - must have both prices AND active connection
+  const usingLivePrices = isWebSocketConnected && livePrices && Object.keys(livePrices).length > 0;
   const priceSource: "websocket" | "http" = usingLivePrices
     ? "websocket"
     : "http";
@@ -197,7 +199,7 @@ export function PortfolioPerformanceSummary({
               Live
             </span>
           ) : (
-            "HTTP Prices"
+            "HTTP"
           )}
         </Badge>
       </CardHeader>

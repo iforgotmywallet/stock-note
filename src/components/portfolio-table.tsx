@@ -7,10 +7,27 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { IconBriefcase, IconCheck, IconX } from "@tabler/icons-react"
+import { IconBriefcase, IconCheck, IconX, IconDots, IconTrash } from "@tabler/icons-react"
 import { useRouter } from "next/navigation"
 
 import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog"
 import {
   Table,
   TableBody,
@@ -19,6 +36,8 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table"
+import { deletePortfolio } from "~/actions/portfolios"
+import { toast } from "sonner"
 
 // Portfolio type based on the database structure
 export interface Portfolio {
@@ -43,7 +62,9 @@ const dayLabels: Record<string, string> = {
 }
 
 // Column definitions for the portfolio table
-const columns: ColumnDef<Portfolio>[] = [
+const createColumns = (
+  onDelete: (portfolio: Portfolio) => void
+): ColumnDef<Portfolio>[] => [
   {
     accessorKey: "name",
     header: "Portfolio Name",
@@ -111,33 +132,60 @@ const columns: ColumnDef<Portfolio>[] = [
     cell: ({ row }) => {
       const tickers = row.original.tickers
       const allocation = row.original.allocation_per_ticker
+      const portfolio = row.original
       
       return (
-        <div className="space-y-2 min-w-0">
-          <div className="flex flex-wrap gap-1">
-            {tickers.slice(0, 5).map((tickerObj) => (
-              <Badge
-                key={tickerObj.ticker}
-                variant="outline"
-                className="text-xs font-mono shrink-0"
-                title={`${tickerObj.ticker} ticker`}
-              >
-                {tickerObj.ticker}
-              </Badge>
-            ))}
-            {tickers.length > 5 && (
-              <Badge
-                variant="outline"
-                className="text-xs shrink-0"
-                title={`${tickers.length - 5} more tickers: ${tickers.slice(5).map(t => t.ticker).join(", ")}`}
-              >
-                +{tickers.length - 5}
-              </Badge>
-            )}
+        <div className="flex items-start justify-between gap-2 min-w-0">
+          <div className="space-y-2 min-w-0 flex-1">
+            <div className="flex flex-wrap gap-1">
+              {tickers.slice(0, 5).map((tickerObj) => (
+                <Badge
+                  key={tickerObj.ticker}
+                  variant="outline"
+                  className="text-xs font-mono shrink-0"
+                  title={`${tickerObj.ticker} ticker`}
+                >
+                  {tickerObj.ticker}
+                </Badge>
+              ))}
+              {tickers.length > 5 && (
+                <Badge
+                  variant="outline"
+                  className="text-xs shrink-0"
+                  title={`${tickers.length - 5} more tickers: ${tickers.slice(5).map(t => t.ticker).join(", ")}`}
+                >
+                  +{tickers.length - 5}
+                </Badge>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {(allocation * 100).toFixed(0)}% per ticker • {row.original.leverage.toFixed(1)}x leverage
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {(allocation * 100).toFixed(0)}% per ticker • {row.original.leverage.toFixed(1)}x leverage
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 shrink-0"
+                aria-label={`Actions for ${portfolio.name}`}
+              >
+                <IconDots className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(portfolio)
+                }}
+              >
+                <IconTrash className="mr-2 size-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )
     },
@@ -150,6 +198,36 @@ interface PortfolioTableProps {
 
 export function PortfolioTable({ portfolios }: PortfolioTableProps) {
   const router = useRouter()
+  const [portfolioToDelete, setPortfolioToDelete] = React.useState<Portfolio | null>(null)
+  const [isDeleting, setIsDeleting] = React.useState(false)
+
+  const handleDelete = (portfolio: Portfolio) => {
+    setPortfolioToDelete(portfolio)
+  }
+
+  const confirmDelete = async () => {
+    if (!portfolioToDelete) return
+
+    setIsDeleting(true)
+    try {
+      const result = await deletePortfolio(portfolioToDelete.id)
+      
+      if (result.success) {
+        toast.success("Portfolio deleted successfully")
+        router.refresh()
+      } else {
+        toast.error(result.error || "Failed to delete portfolio")
+      }
+    } catch (error) {
+      console.error("Error deleting portfolio:", error)
+      toast.error("An unexpected error occurred")
+    } finally {
+      setIsDeleting(false)
+      setPortfolioToDelete(null)
+    }
+  }
+
+  const columns = React.useMemo(() => createColumns(handleDelete), [])
   
   const table = useReactTable({
     data: portfolios,
@@ -192,51 +270,77 @@ export function PortfolioTable({ portfolios }: PortfolioTableProps) {
   }
 
   return (
-    <div className="rounded-lg border overflow-hidden">
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="whitespace-nowrap">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow 
-                key={row.id}
-                className="cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => handleRowClick(row.original.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    handleRowClick(row.original.id)
-                  }
-                }}
-                aria-label={`View dashboard for ${row.original.name} portfolio`}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="align-top">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+    <>
+      <div className="rounded-lg border overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="whitespace-nowrap">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow 
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleRowClick(row.original.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleRowClick(row.original.id)
+                    }
+                  }}
+                  aria-label={`View dashboard for ${row.original.name} portfolio`}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="align-top">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
-    </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!portfolioToDelete} onOpenChange={(open) => !open && setPortfolioToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Portfolio</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{portfolioToDelete?.name}</strong>? 
+              This will permanently remove the portfolio and all its associated data including positions, 
+              actions, and daily values. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

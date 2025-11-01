@@ -4,6 +4,7 @@ import { auth } from "~/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { PortfoliosService, type CreatePortfolioParams, type PortfolioWithTickers } from "~/lib/database/portfolios";
+import { UsersService, PORTFOLIO_CREATION_COST } from "~/lib/database/users";
 import { getEffectiveAllocation } from "~/lib/utils";
 
 export interface CreatePortfolioFormData {
@@ -35,6 +36,16 @@ export async function createPortfolio(formData: CreatePortfolioFormData): Promis
 
     if (!session?.user?.id) {
       redirect("/auth/sign-in");
+    }
+
+    // Check if user has enough credits
+    const creditCheck = await UsersService.canCreatePortfolio(session.user.id);
+    if (!creditCheck.canCreate) {
+      return {
+        success: false,
+        message: "Insufficient credits",
+        error: `You need ${creditCheck.requiredCredits} credits to create a portfolio. Your current balance is ${creditCheck.currentCredits} credits.`,
+      };
     }
 
     // Validate form data
@@ -72,6 +83,15 @@ export async function createPortfolio(formData: CreatePortfolioFormData): Promis
 
     // Create portfolio using database service
     const portfolio = await PortfoliosService.createPortfolio(createParams);
+
+    // Deduct credits after successful portfolio creation
+    try {
+      await UsersService.deductPortfolioCreationCredits(session.user.id);
+    } catch (creditError) {
+      console.error("Failed to deduct credits after portfolio creation:", creditError);
+      // Portfolio was created but credit deduction failed - log this for manual review
+      // We don't want to fail the entire operation or delete the portfolio
+    }
 
     return {
       success: true,
@@ -173,6 +193,26 @@ export async function getUserPortfolios(): Promise<PortfolioWithTickers[]> {
 }
 
 /**
+ * Get the current user's credit balance
+ */
+export async function getUserCredits(): Promise<number> {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      redirect("/auth/sign-in");
+    }
+
+    return await UsersService.getUserCredits(session.user.id);
+  } catch (error) {
+    console.error("Error fetching user credits:", error);
+    throw new Error("Failed to fetch user credits");
+  }
+}
+
+/**
  * Verify if the current user owns a specific portfolio
  */
 export async function verifyPortfolioOwnership(portfolioId: string): Promise<boolean> {
@@ -219,6 +259,49 @@ export async function getPortfolioById(portfolioId: string): Promise<PortfolioWi
 }
 
 /**
+ * Delete a portfolio and all its related data
+ * IMPORTANT: Deletes PortfolioAction records first, then other related tables
+ * Does NOT delete the agent_reports themselves
+ */
+export async function deletePortfolio(portfolioId: string): Promise<{ success: boolean; message: string; error?: string }> {
+  try {
+    // Get the current user session
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      redirect("/auth/sign-in");
+    }
+
+    // Verify ownership before deletion
+    const isOwner = await PortfoliosService.verifyPortfolioOwnership(portfolioId, session.user.id);
+    if (!isOwner) {
+      return {
+        success: false,
+        message: "Unauthorized",
+        error: "You do not have permission to delete this portfolio",
+      };
+    }
+
+    // Delete portfolio using database service (handles cascade deletion)
+    await PortfoliosService.deletePortfolio(portfolioId);
+
+    return {
+      success: true,
+      message: "Portfolio deleted successfully",
+    };
+  } catch (error) {
+    console.error("Error deleting portfolio:", error);
+    return {
+      success: false,
+      message: "Failed to delete portfolio",
+      error: error instanceof Error ? error.message : "An unexpected error occurred",
+    };
+  }
+}
+
+/**
  * Validate portfolio form data with comprehensive checks
  */
 function validatePortfolioFormData(formData: CreatePortfolioFormData): { isValid: boolean; error?: string } {
@@ -256,8 +339,8 @@ function validatePortfolioFormData(formData: CreatePortfolioFormData): { isValid
     return { isValid: false, error: "At least one ticker symbol is required for the portfolio" };
   }
 
-  if (formData.tickers.length > 20) {
-    return { isValid: false, error: "Maximum 20 ticker symbols allowed per portfolio" };
+  if (formData.tickers.length > 10) {
+    return { isValid: false, error: "Maximum 10 ticker symbols allowed per portfolio" };
   }
 
   // Check for duplicate tickers

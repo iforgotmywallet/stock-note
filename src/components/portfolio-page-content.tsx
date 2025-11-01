@@ -18,7 +18,9 @@ interface PortfolioPageContentProps {
   portfolios: Portfolio[];
 }
 
-export function PortfolioPageContent({ portfolios: initialPortfolios }: PortfolioPageContentProps) {
+export function PortfolioPageContent({
+  portfolios: initialPortfolios,
+}: PortfolioPageContentProps) {
   const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -33,14 +35,17 @@ export function PortfolioPageContent({ portfolios: initialPortfolios }: Portfoli
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold">Portfolio Management</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Create and manage your investment portfolios with automated scheduling
+            <h1 className="text-xl font-bold sm:text-2xl">
+              Portfolio Management
+            </h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
+              Build and schedule portfolios automatically to visualize
+              performance over time.
             </p>
           </div>
         </div>
-        <Button 
-          className="flex items-center gap-2 w-full sm:w-auto"
+        <Button
+          className="flex w-full items-center gap-2 sm:w-auto"
           onClick={() => setIsDialogOpen(true)}
           aria-label="Create new portfolio"
         >
@@ -52,11 +57,12 @@ export function PortfolioPageContent({ portfolios: initialPortfolios }: Portfoli
       {/* Portfolio Content */}
       <div className="space-y-4">
         {initialPortfolios.length > 0 && (
-          <div className="text-sm text-muted-foreground">
-            {initialPortfolios.length} portfolio{initialPortfolios.length !== 1 ? "s" : ""} found
+          <div className="text-muted-foreground text-sm">
+            {initialPortfolios.length} portfolio
+            {initialPortfolios.length !== 1 ? "s" : ""} found
           </div>
         )}
-        
+
         {/* Portfolio Table */}
         <Card>
           <CardHeader>

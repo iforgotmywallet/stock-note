@@ -16,12 +16,14 @@ import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { Slider } from "./ui/slider";
 import { Switch } from "./ui/switch";
-import { X } from "lucide-react";
+import { X, Coins } from "lucide-react";
 import { PortfolioTickerSelector } from "./portfolio-ticker-selector";
-import { createPortfolio, type CreatePortfolioFormData } from "~/actions/portfolios";
+import { createPortfolio, getUserCredits, type CreatePortfolioFormData } from "~/actions/portfolios";
 import { loadTickerData } from "~/lib/utils/ticker-utils";
 import { getEffectiveAllocation } from "~/lib/utils";
 import { toast } from "sonner";
+
+const PORTFOLIO_CREATION_COST = 15;
 
 interface PortfolioCreateDialogProps {
   open: boolean;
@@ -56,6 +58,8 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [tickerData, setTickerData] = useState<Record<string, string>>({});
   const [isLoadingTickers, setIsLoadingTickers] = useState(false);
+  const [userCredits, setUserCredits] = useState<number | null>(null);
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
 
   // Load ticker data when component mounts
   useEffect(() => {
@@ -75,6 +79,26 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
     loadTickers();
   }, []);
 
+  // Load user credits when dialog opens
+  useEffect(() => {
+    if (open) {
+      const loadCredits = async () => {
+        setIsLoadingCredits(true);
+        try {
+          const credits = await getUserCredits();
+          setUserCredits(credits);
+        } catch (error) {
+          console.error("Failed to load user credits:", error);
+          toast.error("Failed to load credit balance.");
+        } finally {
+          setIsLoadingCredits(false);
+        }
+      };
+
+      loadCredits();
+    }
+  }, [open]);
+
   // Reset form when dialog opens/closes
   React.useEffect(() => {
     if (!open) {
@@ -89,6 +113,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
       });
       setErrors({});
       setIsSubmitting(false);
+      setUserCredits(null);
     }
   }, [open]);
 
@@ -115,8 +140,8 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
     // Validate tickers
     if (formData.tickers?.length === 0) {
       newErrors.tickers = "At least one ticker is required";
-    } else if (formData.tickers.length > 5) {
-      newErrors.tickers = "Maximum 5 tickers allowed per portfolio";
+    } else if (formData.tickers.length > 10) {
+      newErrors.tickers = "Maximum 10 tickers allowed per portfolio";
     } else {
       // Validate individual tickers
       const invalidTickers: string[] = [];
@@ -222,28 +247,47 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
       } else {
         // Handle server-side validation errors
         const errorMessage = result.message || "Failed to create portfolio";
-        toast.error(errorMessage);
         
         if (result.error) {
           // Map specific server errors to form fields
           const serverError = result.error.toLowerCase();
           
-          if (serverError.includes("name")) {
+          // Handle insufficient credits error
+          if (serverError.includes("credit") || serverError.includes("balance")) {
+            toast.error(result.error);
+            setErrors({ general: result.error });
+            // Refresh credit balance
+            try {
+              const credits = await getUserCredits();
+              setUserCredits(credits);
+            } catch (e) {
+              console.error("Failed to refresh credits:", e);
+            }
+          } else if (serverError.includes("name")) {
+            toast.error(errorMessage);
             setErrors({ name: result.error });
           } else if (serverError.includes("ticker")) {
+            toast.error(errorMessage);
             setErrors({ tickers: result.error });
           } else if (serverError.includes("day")) {
+            toast.error(errorMessage);
             setErrors({ days_of_week: result.error });
           } else if (serverError.includes("allocation")) {
+            toast.error(errorMessage);
             setErrors({ allocation_per_ticker: result.error });
           } else if (serverError.includes("authentication") || serverError.includes("unauthorized")) {
+            toast.error("Authentication error. Please sign in again.");
             setErrors({ general: "Authentication error. Please sign in again." });
             // Could redirect to login here if needed
           } else if (serverError.includes("database") || serverError.includes("connection")) {
+            toast.error("Database connection error. Please try again later.");
             setErrors({ general: "Database connection error. Please try again later." });
           } else {
+            toast.error(errorMessage);
             setErrors({ general: result.error });
           }
+        } else {
+          toast.error(errorMessage);
         }
       }
     } catch (error) {
@@ -403,7 +447,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
 
           {/* Ticker Selection */}
           <div className="space-y-2">
-            <Label id="tickers-label">Tickers * (max 5)</Label>
+            <Label id="tickers-label">Tickers * (max 10)</Label>
             <PortfolioTickerSelector
               selectedTickers={formData.tickers}
               onTickersChange={(tickers) => {
@@ -418,17 +462,17 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
               }}
               disabled={isSubmitting || isLoadingTickers}
               placeholder={isLoadingTickers ? "Loading ticker data..." : "Select stock tickers for your portfolio"}
-              maxSelections={5}
+              maxSelections={10}
               aria-labelledby="tickers-label"
               aria-describedby={errors.tickers ? "tickers-error" : "tickers-count"}
               aria-invalid={!!errors.tickers}
             />
             <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-xs text-muted-foreground">
               <span id="tickers-count" aria-live="polite">
-                {formData.tickers.length}/5 tickers selected
+                {formData.tickers.length}/10 tickers selected
               </span>
               <span className="text-xs text-muted-foreground">
-                Limited to 5 tickers for better trading concentration
+                Limited to 10 tickers for optimal portfolio management
               </span>
               {isLoadingTickers && (
                 <span aria-live="polite">Loading validation data...</span>
@@ -636,6 +680,31 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
             </span>
           </div>
 
+          {/* Credit Cost Display */}
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+            <div className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-amber-500" aria-hidden="true" />
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">Portfolio Creation Cost</span>
+                <span className="text-xs text-muted-foreground">
+                  {isLoadingCredits ? (
+                    "Loading balance..."
+                  ) : userCredits !== null ? (
+                    <>Your balance: {userCredits} credits</>
+                  ) : (
+                    "Balance unavailable"
+                  )}
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold">{PORTFOLIO_CREATION_COST} credits</div>
+              {userCredits !== null && userCredits < PORTFOLIO_CREATION_COST && (
+                <div className="text-xs text-destructive font-medium">Insufficient balance</div>
+              )}
+            </div>
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
@@ -647,7 +716,7 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || isLoadingTickers || Object.values(errors).some(error => error && error.trim())}
+              disabled={isSubmitting || isLoadingTickers || isLoadingCredits || Object.values(errors).some(error => error && error.trim())}
               aria-describedby={isSubmitting ? "submit-status" : undefined}
             >
               {isSubmitting ? (

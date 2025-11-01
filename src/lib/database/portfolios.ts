@@ -352,6 +352,41 @@ export class PortfoliosService {
   }
 
   /**
+   * Delete a portfolio and all its related data
+   * IMPORTANT: The database schema has onDelete: Cascade configured, so related records
+   * (PortfolioTicker, PortfolioAction, PortfolioPosition, PortfolioDailyValue) 
+   * will be automatically deleted. Does NOT delete agent_reports.
+   * @param portfolioId - Portfolio ID to delete
+   * @returns Promise<void>
+   */
+  static async deletePortfolio(portfolioId: string): Promise<void> {
+    try {
+      // Validate input
+      if (!portfolioId || typeof portfolioId !== "string") {
+        throw new Error("Portfolio ID is required and must be a string");
+      }
+
+      // Delete the portfolio - cascade will handle related records
+      await db.portfolio.delete({
+        where: { id: portfolioId },
+      });
+
+      console.log(`Portfolio ${portfolioId} and all related data deleted successfully`);
+    } catch (error) {
+      console.error("Error deleting portfolio:", error);
+      
+      if (error instanceof Error) {
+        // Handle specific Prisma errors
+        if (error.message.includes("Record to delete does not exist")) {
+          throw new Error("Portfolio not found");
+        }
+      }
+      
+      throw new Error("Failed to delete portfolio");
+    }
+  }
+
+  /**
    * Validate portfolio creation parameters
    * @param params - Parameters to validate
    * @throws Error if validation fails

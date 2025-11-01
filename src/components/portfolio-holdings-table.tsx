@@ -249,6 +249,9 @@ export function PortfolioHoldingsTable({
     { id: "ticker", desc: false }, // Default sort by ticker ascending
   ]);
 
+  // Determine if we're using live prices - must have both WebSocket connection AND price data
+  const isUsingLivePrices = priceSource === "websocket" && livePrices && Object.keys(livePrices).length > 0;
+
   // Merge live prices with positions data for accurate real-time P/L calculations
   // Filter out positions with 0 shares
   const positionsWithLivePrices = React.useMemo(() => {
@@ -257,12 +260,16 @@ export function PortfolioHoldingsTable({
       (position) => position.shares !== 0,
     );
 
-    if (!livePrices || Object.keys(livePrices).length === 0) {
-      return activePositions;
+    // Only use live prices if WebSocket is connected AND we have price data
+    if (!isUsingLivePrices) {
+      return activePositions.map((position) => ({
+        ...position,
+        price_source: position.last_price ? ("stored" as const) : undefined,
+      }));
     }
 
     return activePositions.map((position) => {
-      const livePrice = livePrices[position.ticker];
+      const livePrice = livePrices![position.ticker];
 
       // If we have a live price, recalculate P/L metrics
       if (livePrice !== undefined && livePrice > 0) {
@@ -287,7 +294,7 @@ export function PortfolioHoldingsTable({
         price_source: position.last_price ? ("stored" as const) : undefined,
       };
     });
-  }, [positions, livePrices]);
+  }, [positions, livePrices, isUsingLivePrices]);
 
   const table = useReactTable({
     data: positionsWithLivePrices,

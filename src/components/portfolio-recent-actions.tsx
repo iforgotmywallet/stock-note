@@ -356,14 +356,14 @@ export function PortfolioRecentActions({
             {/* Action Note */}
             {selectedAction?.note && (
               <div className="rounded-lg border p-4 bg-muted/50">
-                <h3 className="text-sm font-semibold mb-2">Action Note</h3>
+                <h3 className="text-sm font-semibold mb-2">Note</h3>
                 <p className="text-sm">{selectedAction.note}</p>
               </div>
             )}
 
             {/* Analysis Section */}
             <div>
-              <h3 className="text-sm font-semibold mb-2">AI Analysis Report</h3>
+              <h3 className="text-sm font-semibold mb-2">Action Report</h3>
               {isLoadingAnalysis && (
                 <div className="flex items-center justify-center py-8">
                   <div className="text-muted-foreground">Loading analysis...</div>

@@ -1,42 +1,42 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "~/lib/auth";
-import { db } from "~/server/db";
+import { headers } from "next/headers";
+import { UsersService } from "~/lib/database/users";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Get the session from the request
+    // Get the current user session
     const session = await auth.api.getSession({
-      headers: request.headers,
+      headers: await headers(),
     });
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
-    // Fetch user credits from database
-    const user = await db.user.findUnique({
-      where: {
-        id: session.user.id,
-      },
-      select: {
-        credits: true,
-        updatedAt: true,
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    // Fetch user credits
+    const credits = await UsersService.getUserCredits(session.user.id);
 
     return NextResponse.json({
-      credits: user.credits,
-      lastUpdated: user.updatedAt,
+      credits,
+      lastUpdated: new Date(),
     });
   } catch (error) {
     console.error("Error fetching user credits:", error);
+    
+    if (error instanceof Error && error.message === "User not found") {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Failed to fetch user credits" },
-      { status: 500 },
+      { error: "Failed to fetch credits" },
+      { status: 500 }
     );
   }
 }

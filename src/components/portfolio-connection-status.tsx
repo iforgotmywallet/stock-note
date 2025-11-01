@@ -16,12 +16,14 @@ interface PortfolioConnectionStatusProps {
   state: WebSocketState;
   onReconnect?: () => void;
   usingHttpFallback?: boolean;
+  hasLivePrices?: boolean; // Whether we actually have live price data
 }
 
 export function PortfolioConnectionStatus({
   state,
   onReconnect,
   usingHttpFallback = false,
+  hasLivePrices = false,
 }: PortfolioConnectionStatusProps) {
   // HTTP Fallback state - show orange badge with manual reconnect option
   if (usingHttpFallback) {
@@ -47,8 +49,8 @@ export function PortfolioConnectionStatus({
     );
   }
 
-  // Connected state - show green "Live" badge with pulse animation
-  if (state.connected) {
+  // Connected state with live prices - show green "Live" badge with pulse animation
+  if (state.connected && hasLivePrices) {
     return (
       <div className="flex items-center gap-2">
         <Badge variant="outline" className="border-green-500/50 bg-green-500/10 text-green-600 dark:text-green-400">

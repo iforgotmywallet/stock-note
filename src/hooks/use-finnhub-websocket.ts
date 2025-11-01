@@ -171,10 +171,9 @@ export function useFinnhubWebSocket(
   }, [maxReconnectAttempts, calculateReconnectDelay]);
 
   // Validate trade message with comprehensive checks
-  const validateTradeMessage = (message: unknown): message is FinnhubTradeMessage => {
+  const validateTradeMessage = useCallback((message: unknown): message is FinnhubTradeMessage => {
     // Check if message exists and is an object
     if (!message || typeof message !== 'object') {
-      console.error('[WebSocket] Validation failed: message is not an object', message);
       return false;
     }
     
@@ -182,113 +181,64 @@ export function useFinnhubWebSocket(
     
     // Check if message has type field and it's 'trade'
     if (!msg.type || msg.type !== 'trade') {
-      console.error('[WebSocket] Validation failed: invalid or missing type field', { type: msg.type });
       return false;
     }
     
     // Check if data field exists and is an array
     if (!Array.isArray(msg.data)) {
-      console.error('[WebSocket] Validation failed: data field is not an array', { data: msg.data });
       return false;
     }
     
     // Validate each trade data item
-    for (let i = 0; i < msg.data.length; i++) {
-      const trade = msg.data[i];
-      
-      // Check if trade is an object
+    for (const trade of msg.data) {
+      // Check if trade is an object with required fields
       if (!trade || typeof trade !== 'object') {
-        console.error(`[WebSocket] Validation failed: trade at index ${i} is not an object`, trade);
         return false;
       }
       
-      // Validate required field: p (price)
-      if (typeof trade.p !== 'number') {
-        console.error(`[WebSocket] Validation failed: trade at index ${i} has invalid price (p)`, { p: trade.p, type: typeof trade.p });
+      // Validate required fields
+      if (typeof trade.p !== 'number' || trade.p <= 0) {
         return false;
       }
       
-      // Validate that price is positive
-      if (trade.p <= 0) {
-        console.error(`[WebSocket] Validation failed: trade at index ${i} has non-positive price`, { p: trade.p });
-        return false;
-      }
-      
-      // Validate required field: s (symbol)
       if (typeof trade.s !== 'string' || trade.s.trim() === '') {
-        console.error(`[WebSocket] Validation failed: trade at index ${i} has invalid symbol (s)`, { s: trade.s, type: typeof trade.s });
         return false;
       }
       
-      // Validate required field: t (timestamp)
       if (typeof trade.t !== 'number' || trade.t <= 0) {
-        console.error(`[WebSocket] Validation failed: trade at index ${i} has invalid timestamp (t)`, { t: trade.t, type: typeof trade.t });
         return false;
       }
       
-      // Validate required field: v (volume)
       if (typeof trade.v !== 'number' || trade.v < 0) {
-        console.error(`[WebSocket] Validation failed: trade at index ${i} has invalid volume (v)`, { v: trade.v, type: typeof trade.v });
         return false;
       }
     }
     
     return true;
-  };
+  }, []);
 
   // Handle incoming WebSocket messages
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
-      // Parse JSON message
-      let message: unknown;
-      try {
-        message = JSON.parse(event.data);
-      } catch (parseError) {
-        console.error('[WebSocket] JSON parsing failed:', {
-          error: parseError instanceof Error ? parseError.message : 'Unknown parse error',
-          rawData: event.data,
-        });
-        return;
-      }
+      const message = JSON.parse(event.data);
 
       // Validate message structure and data types
       if (!validateTradeMessage(message)) {
-        console.warn('[WebSocket] Invalid trade message received - validation failed');
         return;
       }
 
-      // Update prices and timestamps for each trade in the message
-      try {
-        message.data.forEach((trade) => {
-          // Double-check price is positive before updating state
-          if (trade.p > 0) {
-            // Accumulate price updates in the pending buffer instead of updating state immediately
-            pendingPriceUpdatesRef.current.prices[trade.s] = trade.p;
-            pendingPriceUpdatesRef.current.timestamps[trade.s] = trade.t;
-            console.log('[WebSocket] Price update buffered:', { ticker: trade.s, price: trade.p, timestamp: trade.t });
-          } else {
-            console.warn('[WebSocket] Skipping non-positive price:', { ticker: trade.s, price: trade.p });
-          }
-        });
-
-        // Trigger debounced flush of accumulated price updates
-        flushPriceUpdates();
-      } catch (stateUpdateError) {
-        console.error('[WebSocket] Error updating price state:', {
-          error: stateUpdateError instanceof Error ? stateUpdateError.message : 'Unknown state update error',
-          message,
-        });
-      }
-
-    } catch (error) {
-      // Catch-all for any unexpected errors
-      console.error('[WebSocket] Unexpected error in message handler:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        eventData: event.data,
+      // Accumulate price updates in the pending buffer
+      message.data.forEach((trade) => {
+        pendingPriceUpdatesRef.current.prices[trade.s] = trade.p;
+        pendingPriceUpdatesRef.current.timestamps[trade.s] = trade.t;
       });
+
+      // Trigger debounced flush of accumulated price updates
+      flushPriceUpdates();
+    } catch (error) {
+      console.error('[WebSocket] Error processing message:', error);
     }
-  }, [flushPriceUpdates]);
+  }, [flushPriceUpdates, validateTradeMessage]);
 
   // Subscribe to tickers
   const subscribe = useCallback((tickersToSubscribe: string[]) => {
@@ -392,27 +342,22 @@ export function useFinnhubWebSocket(
 
       ws.onerror = (error) => {
         console.error('[WebSocket] Connection error:', error);
-        setConnectionState((prev) => ({
-          ...prev,
-          connected: false,
-          connecting: false,
-          error: 'Connection error occurred',
-        }));
-        
-        // Trigger reconnection on error
-        scheduleReconnection();
       };
 
-      ws.onclose = () => {
-        console.log('[WebSocket] Connection closed');
+      ws.onclose = (event) => {
+        console.log('[WebSocket] Connection closed', { code: event.code, reason: event.reason });
+        
         setConnectionState((prev) => ({
           ...prev,
           connected: false,
           connecting: false,
+          error: event.reason || 'Connection closed',
         }));
 
-        // Trigger reconnection on close
-        scheduleReconnection();
+        // Only trigger reconnection if not a normal closure
+        if (event.code !== 1000) {
+          scheduleReconnection();
+        }
       };
 
     } catch (error) {
