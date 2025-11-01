@@ -6,7 +6,7 @@ import { AgentReportsService } from "~/lib/database/agent-reports";
 
 export const dailyPortfolioCron = inngest.createFunction(
   { id: "daily-portfolio-cron" },
-  { cron: "30 13 * * 1-5" }, // Runs Mon–Fri at 9:30 AM EST
+  { cron: "45 15 * * 1-5" }, // Runs Mon–Fri at 11:45 AM EST
   async ({ step }) => {
     const today = new Date()
       .toLocaleString("en-US", { weekday: "long" })
