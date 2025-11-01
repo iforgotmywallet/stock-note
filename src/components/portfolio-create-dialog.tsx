@@ -133,8 +133,8 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
     }
 
     // Validate description length
-    if (formData.description && formData.description.length > 500) {
-      newErrors.description = "Description must be 500 characters or less";
+    if (formData.description && formData.description.length > 250) {
+      newErrors.description = "Description must be 250 characters or less";
     }
 
     // Validate tickers
@@ -426,16 +426,16 @@ export const PortfolioCreateDialog: React.FC<PortfolioCreateDialogProps> = ({
                   });
                 }
               }}
-              placeholder="Optional description for your portfolio (max 500 characters)"
+              placeholder="Optional description for your portfolio (max 250 characters)"
               disabled={isSubmitting}
               rows={3}
-              maxLength={500}
+              maxLength={250}
               aria-invalid={!!errors.description}
               aria-describedby={errors.description ? "description-error" : "description-count"}
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span id="description-count" aria-live="polite">
-                {formData.description?.length || 0}/500 characters
+                {formData.description?.length || 0}/250 characters
               </span>
             </div>
             {errors.description && (

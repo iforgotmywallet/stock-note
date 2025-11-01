@@ -70,14 +70,18 @@ const createColumns = (
     header: "Portfolio Name",
     cell: ({ row }) => {
       const portfolio = row.original
+      const truncatedDescription = portfolio.description && portfolio.description.length > 100
+        ? portfolio.description.substring(0, 100) + "..."
+        : portfolio.description
+      
       return (
-        <div className="space-y-1 min-w-0">
+        <div className="space-y-1 min-w-0 max-w-xs">
           <div className="font-medium truncate" title={portfolio.name}>
             {portfolio.name}
           </div>
-          {portfolio.description && (
-            <div className="text-sm text-muted-foreground line-clamp-2" title={portfolio.description}>
-              {portfolio.description}
+          {truncatedDescription && (
+            <div className="text-sm text-muted-foreground truncate" title={portfolio.description || undefined}>
+              {truncatedDescription}
             </div>
           )}
         </div>
@@ -236,7 +240,7 @@ export function PortfolioTable({ portfolios }: PortfolioTableProps) {
     }
   }
 
-  const columns = React.useMemo(() => createColumns(handleDelete), [])
+  const columns = React.useMemo(() => createColumns(handleDelete), [handleDelete])
   
   const table = useReactTable({
     data: portfolios,

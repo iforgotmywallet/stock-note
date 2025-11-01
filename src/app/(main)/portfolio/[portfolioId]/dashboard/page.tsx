@@ -108,6 +108,7 @@ function DashboardContent({ data }: { data: DashboardData }) {
           portfolioId={portfolio.id}
           portfolioName={portfolio.name}
           portfolioLeverage={portfolio.leverage}
+          portfolioTickers={portfolio.tickers.map(t => t.ticker)}
           initialPositions={positions}
           initialActions={actions}
         />

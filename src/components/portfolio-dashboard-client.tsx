@@ -21,6 +21,7 @@ interface PortfolioDashboardClientProps {
   portfolioId: string;
   portfolioName: string;
   portfolioLeverage: number;
+  portfolioTickers: string[];
   initialPositions: PortfolioPositionWithMetrics[];
   initialActions: PortfolioActionWithDetails[];
 }
@@ -32,6 +33,7 @@ export function PortfolioDashboardClient({
   portfolioId,
   portfolioName,
   portfolioLeverage,
+  portfolioTickers,
   initialPositions,
   initialActions,
 }: PortfolioDashboardClientProps) {
@@ -363,6 +365,7 @@ export function PortfolioDashboardClient({
         <PortfolioPerformanceSummary
           positions={positionsWithLivePrices}
           portfolioLeverage={portfolioLeverage}
+          portfolioTickers={portfolioTickers}
           livePrices={livePrices}
           priceTimestamps={priceTimestamps}
           isWebSocketConnected={connectionState.connected}

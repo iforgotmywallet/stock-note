@@ -26,6 +26,7 @@ interface PortfolioPosition {
 interface PerformanceSummaryProps {
   positions: PortfolioPosition[];
   portfolioLeverage?: number; // e.g., 4.0
+  portfolioTickers?: string[]; // Configured tickers in the portfolio
   livePrices?: Record<string, number>; // ticker -> live price from WebSocket
   priceTimestamps?: Record<string, number>; // ticker -> timestamp of last update
   isWebSocketConnected?: boolean; // Whether WebSocket is actively connected
@@ -50,6 +51,7 @@ interface PerformanceMetrics {
 export function PortfolioPerformanceSummary({
   positions,
   portfolioLeverage = 1.0,
+  portfolioTickers = [],
   livePrices,
   priceTimestamps,
   isWebSocketConnected = false,
@@ -178,30 +180,52 @@ export function PortfolioPerformanceSummary({
       minute: "2-digit",
     }).format(d);
 
+  // Use configured portfolio tickers (sorted)
+  const tickers = useMemo(() => {
+    return [...portfolioTickers].sort();
+  }, [portfolioTickers]);
+
   // 🧠 Render
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5" />
-          Performance Summary
-        </CardTitle>
-        <Badge
-          variant={priceSource === "websocket" ? "default" : "outline"}
-          className={`text-xs ${priceSource === "websocket" ? "bg-green-600 dark:bg-green-700" : ""}`}
-        >
-          {priceSource === "websocket" ? (
-            <span className="flex items-center gap-1">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-300 opacity-75"></span>
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400"></span>
+      <CardHeader className="pb-4">
+        <div className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Performance Summary
+          </CardTitle>
+          <Badge
+            variant={priceSource === "websocket" ? "default" : "outline"}
+            className={`text-xs ${priceSource === "websocket" ? "bg-green-600 dark:bg-green-700" : ""}`}
+          >
+            {priceSource === "websocket" ? (
+              <span className="flex items-center gap-1">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-300 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400"></span>
+                </span>
+                Live
               </span>
-              Live
-            </span>
-          ) : (
-            "HTTP"
-          )}
-        </Badge>
+            ) : (
+              "HTTP"
+            )}
+          </Badge>
+        </div>
+        
+        {/* Ticker badges */}
+        {tickers.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1">
+            {tickers.map((ticker) => (
+              <Badge
+                key={ticker}
+                variant="outline"
+                className="text-xs font-mono"
+              >
+                {ticker}
+              </Badge>
+            ))}
+          </div>
+        )}
       </CardHeader>
 
       <CardContent>
