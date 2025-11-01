@@ -147,7 +147,7 @@ const data = {
     },
     {
       title: "Get Help",
-      url: "#",
+      url: "https://deltaday.gitbook.io/stocknotes/",
       icon: IconHelp,
     },
   ],
