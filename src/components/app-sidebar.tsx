@@ -81,7 +81,7 @@ const data = {
       icon: IconTable,
     },
     {
-      title: "Chat",
+      title: "Insight Room",
       url: "/chat",
       icon: IconMessageChatbot,
     },
