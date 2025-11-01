@@ -4,7 +4,7 @@ import { auth } from "~/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { PortfoliosService, type CreatePortfolioParams, type PortfolioWithTickers } from "~/lib/database/portfolios";
-import { UsersService, PORTFOLIO_CREATION_COST } from "~/lib/database/users";
+import { UsersService } from "~/lib/database/users";
 import { getEffectiveAllocation } from "~/lib/utils";
 
 export interface CreatePortfolioFormData {

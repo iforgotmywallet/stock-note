@@ -82,8 +82,7 @@ export async function GET(request: NextRequest) {
       error: string | null;
     }> = [];
 
-    for (let i = 0; i < tickers.length; i++) {
-      const ticker = tickers[i]!; // Safe because we filtered empty strings
+    for (const ticker of tickers) {
 
       try {
         const finnhubResponse = await fetch(
