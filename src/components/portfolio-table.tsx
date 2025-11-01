@@ -132,48 +132,57 @@ const createColumns = (
     cell: ({ row }) => {
       const tickers = row.original.tickers
       const allocation = row.original.allocation_per_ticker
+      
+      return (
+        <div className="space-y-2 min-w-0">
+          <div className="flex flex-wrap gap-1">
+            {tickers.slice(0, 5).map((tickerObj) => (
+              <Badge
+                key={tickerObj.ticker}
+                variant="outline"
+                className="text-xs font-mono shrink-0"
+                title={`${tickerObj.ticker} ticker`}
+              >
+                {tickerObj.ticker}
+              </Badge>
+            ))}
+            {tickers.length > 5 && (
+              <Badge
+                variant="outline"
+                className="text-xs shrink-0"
+                title={`${tickers.length - 5} more tickers: ${tickers.slice(5).map(t => t.ticker).join(", ")}`}
+              >
+                +{tickers.length - 5}
+              </Badge>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {(allocation * 100).toFixed(0)}% per ticker • {row.original.leverage.toFixed(1)}x leverage
+          </div>
+        </div>
+      )
+    },
+  },
+  {
+    id: "actions",
+    header: () => <div className="text-right">Actions</div>,
+    cell: ({ row }) => {
       const portfolio = row.original
       
       return (
-        <div className="flex items-start justify-between gap-2 min-w-0">
-          <div className="space-y-2 min-w-0 flex-1">
-            <div className="flex flex-wrap gap-1">
-              {tickers.slice(0, 5).map((tickerObj) => (
-                <Badge
-                  key={tickerObj.ticker}
-                  variant="outline"
-                  className="text-xs font-mono shrink-0"
-                  title={`${tickerObj.ticker} ticker`}
-                >
-                  {tickerObj.ticker}
-                </Badge>
-              ))}
-              {tickers.length > 5 && (
-                <Badge
-                  variant="outline"
-                  className="text-xs shrink-0"
-                  title={`${tickers.length - 5} more tickers: ${tickers.slice(5).map(t => t.ticker).join(", ")}`}
-                >
-                  +{tickers.length - 5}
-                </Badge>
-              )}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {(allocation * 100).toFixed(0)}% per ticker • {row.original.leverage.toFixed(1)}x leverage
-            </div>
-          </div>
+        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 shrink-0"
+                className="h-8 w-8 p-0"
                 aria-label={`Actions for ${portfolio.name}`}
               >
                 <IconDots className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuContent align="end">
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={(e) => {
@@ -249,11 +258,12 @@ export function PortfolioTable({ portfolios }: PortfolioTableProps) {
               <TableHead>Trading Days</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Tickers</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow>
-              <TableCell colSpan={4} className="h-32 text-center">
+              <TableCell colSpan={5} className="h-32 text-center">
                 <div className="flex flex-col items-center gap-3 text-muted-foreground">
                   <IconBriefcase className="size-12" />
                   <div className="space-y-1">
