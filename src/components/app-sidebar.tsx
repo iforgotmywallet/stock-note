@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   IconCamera,
   IconFileAi,
@@ -191,10 +192,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="/">
+              <Link href="/">
                 <IconStackMiddle className="!size-5" />
                 <span className="text-base font-semibold">StockNotes</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
