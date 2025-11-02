@@ -6,6 +6,7 @@ import { Providers } from "~/components/providers";
 import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/app-sidebar";
 import { SiteHeader } from "~/components/site-header";
+import { AdminBanner } from "~/components/admin-banner";
 import { Toaster } from "sonner";
 import { Analytics } from '@vercel/analytics/next';
 
@@ -38,6 +39,7 @@ export default function RootLayout({
             >
               <AppSidebar variant="inset" />
               <SidebarInset>
+                <AdminBanner />
                 <SiteHeader />
                 <div className="flex flex-1 flex-col">
                   <div className="@container/main flex flex-1 flex-col gap-2">
