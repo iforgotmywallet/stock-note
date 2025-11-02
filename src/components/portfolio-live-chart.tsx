@@ -329,21 +329,21 @@ export function LivePortfolioChart({
                       />
                     }
                   />
-                  {/* 🟦 Buying Power (drawn first, lower layer) */}
+                  {/* 🟦 Buying Power */}
                   <Area
                     dataKey="buyingPower"
                     type="monotone"
                     fill="url(#fillBuyingPower)"
                     stroke="var(--color-buyingPower)"
-                    stackId="a"
+                    fillOpacity={0.3}
                   />
-                  {/* 🟩 Equity (drawn second, upper layer) */}
+                  {/* 🟩 Equity */}
                   <Area
                     dataKey="equity"
                     type="monotone"
                     fill="url(#fillEquity)"
                     stroke="var(--color-equity)"
-                    stackId="a"
+                    fillOpacity={0.3}
                   />
                   <ChartLegend
                     content={<ChartLegendContent className="mt-4" />}
