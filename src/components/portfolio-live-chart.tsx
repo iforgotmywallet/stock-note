@@ -74,6 +74,13 @@ export function LivePortfolioChart({
   // 🧮 Compute equity & buying power dynamically
   const computePortfolioValues = useMemo(() => {
     return (prices: Record<string, number>) => {
+      // If no positions, return default values
+      if (positions.length === 0) {
+        const defaultEquity = 100000;
+        const defaultBuyingPower = defaultEquity * portfolioLeverage;
+        return { equity: defaultEquity, buyingPower: defaultBuyingPower };
+      }
+
       let unrealizedPnl = 0;
       let longExposure = 0;
       let shortExposure = 0;
@@ -105,6 +112,25 @@ export function LivePortfolioChart({
   useEffect(() => {
     if (hasInitialized) return;
     
+    // If no positions, initialize immediately with default values
+    if (positions.length === 0) {
+      const { equity, buyingPower } = computePortfolioValues({});
+      const now = Date.now();
+
+      setHistory([
+        {
+          time: "0s",
+          equity,
+          buyingPower,
+          timestamp: now,
+        },
+      ]);
+      
+      setHasInitialized(true);
+      console.log('[LiveChart] Initialized with default values (no positions)');
+      return;
+    }
+    
     // Use initial prices from database if available
     const pricesToUse = initialPrices && Object.keys(initialPrices).length > 0 
       ? initialPrices 
@@ -128,7 +154,7 @@ export function LivePortfolioChart({
     
     setHasInitialized(true);
     console.log('[LiveChart] Initialized with', Object.keys(pricesToUse).length > 0 && Object.keys(livePrices).length === 0 ? 'database' : 'live', 'prices');
-  }, [hasInitialized, initialPrices, livePrices, computePortfolioValues]);
+  }, [hasInitialized, initialPrices, livePrices, computePortfolioValues, positions.length]);
 
   // 🕒 Update chart data when live prices change (websocket updates)
   useEffect(() => {
