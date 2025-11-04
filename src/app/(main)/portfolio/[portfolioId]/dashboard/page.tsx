@@ -31,6 +31,13 @@ interface DashboardData {
   portfolio: PortfolioWithTickers;
   positions: PortfolioPositionWithMetrics[];
   actions: PortfolioActionWithDetails[];
+  dailyValues: Array<{
+    date: Date;
+    net_value: number;
+    cash_balance: number | null;
+    long_value: number | null;
+    short_value: number | null;
+  }>;
 }
 
 /**
@@ -51,15 +58,17 @@ async function getDashboardData(portfolioId: string, userId: string): Promise<Da
     }
 
     // Fetch all dashboard data in parallel for better performance
-    const [positions, actions] = await Promise.all([
+    const [positions, actions, dailyValues] = await Promise.all([
       PortfoliosService.getPortfolioPositions(portfolioId),
       PortfoliosService.getPortfolioActions(portfolioId, 10),
+      PortfoliosService.getPortfolioDailyValues(portfolioId),
     ]);
 
     return {
       portfolio,
       positions,
       actions,
+      dailyValues,
     };
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
@@ -71,7 +80,7 @@ async function getDashboardData(portfolioId: string, userId: string): Promise<Da
  * Dashboard content component with error boundaries
  */
 function DashboardContent({ data }: { data: DashboardData }) {
-  const { portfolio, positions, actions } = data;
+  const { portfolio, positions, actions, dailyValues } = data;
 
   return (
     <PortfolioDashboardErrorBoundary>
@@ -111,6 +120,7 @@ function DashboardContent({ data }: { data: DashboardData }) {
           portfolioTickers={portfolio.tickers.map(t => t.ticker)}
           initialPositions={positions}
           initialActions={actions}
+          dailyValues={dailyValues}
         />
       </div>
     </PortfolioDashboardErrorBoundary>

@@ -47,9 +47,7 @@ export function PortfolioDashboardClient({
 }: PortfolioDashboardClientProps) {
   const [positions, setPositions] = useState(initialPositions);
   const [actions, setActions] = useState(initialActions);
-  const [holdingsLoading, setHoldingsLoading] = useState(false);
   const [actionsLoading, setActionsLoading] = useState(false);
-  const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [actionsError, setActionsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -71,7 +69,6 @@ export function PortfolioDashboardClient({
     connectionState,
     subscribe,
     unsubscribe,
-    reconnect,
     shouldFallbackToHttp,
   } = useFinnhubWebSocket(tickers);
 
@@ -158,18 +155,7 @@ export function PortfolioDashboardClient({
       // Update ticker ref
       prevTickersRef.current = tickers;
     }
-  }, [portfolioId, tickers, connectionState.connected, subscribe, unsubscribe]);
-
-  // Extract initial prices from database positions for chart initialization
-  const initialPricesFromDB = useMemo(() => {
-    const prices: Record<string, number> = {};
-    positions.forEach((position) => {
-      if (position.last_price && position.last_price > 0) {
-        prices[position.ticker] = position.last_price;
-      }
-    });
-    return prices;
-  }, [positions]);
+  }, [portfolioId, tickers, connectionState.connected, subscribe, unsubscribe, initialPositions, initialActions]);
 
   // Merge live prices with position data
   const positionsWithLivePrices = useMemo(() => {
@@ -302,11 +288,7 @@ export function PortfolioDashboardClient({
     }
   };
 
-  // Retry handlers
-  const retryHoldings = () => {
-    fetchLivePricesHTTP();
-  };
-
+  // Retry handler for actions
   const retryActions = () => {
     fetchActions();
   };
@@ -393,11 +375,7 @@ export function PortfolioDashboardClient({
           historicalValues={dailyValues.map((v) => ({
             date: v.date.toISOString(),
             net_value: v.net_value,
-            cash_balance: v.cash_balance,
-            long_value: v.long_value,
-            short_value: v.short_value,
           }))}
-          portfolioLeverage={portfolioLeverage}
           startingEquity={100000}
           isWebSocketConnected={connectionState.connected}
         />
@@ -416,37 +394,7 @@ export function PortfolioDashboardClient({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={fetchLivePricesHTTP}
-              disabled={holdingsLoading}
-              className="flex items-center gap-2 text-sm text-blue-600 transition-colors hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              {holdingsLoading ? (
-                <>
-                  <div className="size-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                  Updating...
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="size-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  Refresh Prices
-                </>
-              )}
-            </button>
-          </div>
+
         </div>
 
         <PortfolioDashboardErrorBoundary
@@ -459,9 +407,6 @@ export function PortfolioDashboardClient({
         >
           <PortfolioHoldingsTable
             positions={positionsWithLivePrices}
-            loading={holdingsLoading}
-            error={holdingsError}
-            onRetry={retryHoldings}
             portfolioName={portfolioName}
             livePrices={livePrices}
             priceSource={

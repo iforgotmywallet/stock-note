@@ -274,6 +274,49 @@ export class PortfoliosService {
   // }
 
   /**
+   * Get daily portfolio values for charting
+   * @param portfolioId - Portfolio ID
+   * @param limit - Optional limit on number of records (default: all)
+   * @returns Promise<Array> - Array of daily values
+   */
+  static async getPortfolioDailyValues(
+    portfolioId: string,
+    limit?: number
+  ): Promise<
+    Array<{
+      date: Date;
+      net_value: number;
+      cash_balance: number | null;
+      long_value: number | null;
+      short_value: number | null;
+    }>
+  > {
+    try {
+      const dailyValues = await db.portfolioDailyValue.findMany({
+        where: {
+          portfolioId,
+        },
+        orderBy: {
+          date: "asc",
+        },
+        select: {
+          date: true,
+          net_value: true,
+          cash_balance: true,
+          long_value: true,
+          short_value: true,
+        },
+        take: limit,
+      });
+
+      return dailyValues;
+    } catch (error) {
+      console.error("Error fetching portfolio daily values:", error);
+      return [];
+    }
+  }
+
+  /**
    * Calculate comprehensive portfolio performance metrics
    * @param portfolioId - Portfolio ID
    * @returns Promise<PerformanceMetrics> - Calculated performance metrics

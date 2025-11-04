@@ -26,14 +26,12 @@ interface PortfolioPosition {
 interface HistoricalValue {
   date: string; // ISO string
   net_value: number;
-  cash_balance?: number;
 }
 
 interface LivePortfolioChartProps {
   positions: PortfolioPosition[];
   livePrices: Record<string, number>;
   historicalValues?: HistoricalValue[];
-  portfolioLeverage?: number;
   startingEquity?: number;
   isWebSocketConnected?: boolean;
 }
@@ -41,12 +39,11 @@ interface LivePortfolioChartProps {
 interface ChartDataPoint {
   time: string;
   equity: number;
-  buyingPower?: number;
   timestamp?: number;
 }
 
 const chartConfig = {
-  equity: { label: "Equity", color: "#10b981" }, // green
+  equity: { label: "Equity", color: "#10b981" },
 } satisfies ChartConfig;
 
 const TIME_RANGES = ["1D", "1W", "1M", "3M", "1Y", "ALL"] as const;
@@ -56,15 +53,13 @@ export function RobinhoodStylePortfolioChart({
   positions,
   livePrices,
   historicalValues = [],
-  portfolioLeverage = 1,
   startingEquity = 100000,
   isWebSocketConnected = false,
 }: LivePortfolioChartProps) {
   const [selectedRange, setSelectedRange] = useState<TimeRange>("1D");
-  const [liveHistory, setLiveHistory] = useState<ChartDataPoint[]>([]);
-  const [sessionStart] = useState(() => Date.now());
+  const [liveDataPoints, setLiveDataPoints] = useState<ChartDataPoint[]>([]);
 
-  // 🧮 Compute equity for live prices
+  // Compute current equity from live prices
   const computeEquity = useMemo(() => {
     return (prices: Record<string, number>) => {
       if (!positions.length) return startingEquity;
@@ -77,26 +72,72 @@ export function RobinhoodStylePortfolioChart({
     };
   }, [positions, startingEquity]);
 
-  // ⏱ Update real-time points (only when 1D)
+  // Get today's starting value from historical data
+  const todayStartValue = useMemo(() => {
+    if (!historicalValues.length) return startingEquity;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find most recent historical value (should be yesterday or earlier)
+    const sortedValues = [...historicalValues].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+
+    return sortedValues[0]?.net_value ?? startingEquity;
+  }, [historicalValues, startingEquity]);
+
+  // Update live data points when WebSocket prices change (1D only)
   useEffect(() => {
-    if (selectedRange !== "1D" || !Object.keys(livePrices).length) return;
+    if (
+      selectedRange !== "1D" ||
+      !isWebSocketConnected ||
+      !Object.keys(livePrices).length
+    ) {
+      return;
+    }
 
     const equity = computeEquity(livePrices);
     const now = Date.now();
-    const elapsed = Math.floor((now - sessionStart) / 1000);
+    const time = new Date(now).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
 
-    setLiveHistory((prev) => [
-      ...prev.filter((p) => now - (p.timestamp ?? 0) < 60 * 60 * 1000),
-      { time: `${elapsed}s`, equity, timestamp: now },
-    ]);
-  }, [livePrices, computeEquity, sessionStart, selectedRange]);
+    setLiveDataPoints((prev) => {
+      // Keep only last hour of data
+      const filtered = prev.filter(
+        (p) => now - (p.timestamp ?? 0) < 60 * 60 * 1000,
+      );
 
-  // 🗓 Filter historical values by time range
-  const filteredHistory = useMemo(() => {
-    if (!historicalValues?.length) return [];
+      // Add new point
+      return [...filtered, { time, equity, timestamp: now }];
+    });
+  }, [livePrices, computeEquity, selectedRange, isWebSocketConnected]);
+
+  // Filter historical data by selected time range
+  const chartData = useMemo(() => {
+    if (selectedRange === "1D") {
+      // For 1D: show live WebSocket data if available, otherwise show today's historical value
+      if (isWebSocketConnected && liveDataPoints.length > 0) {
+        return liveDataPoints;
+      }
+
+      // Fallback: show today's starting value as a single point
+      return [
+        {
+          time: "Market Open",
+          equity: todayStartValue,
+        },
+      ];
+    }
+
+    // For other ranges: filter historical daily values
+    if (!historicalValues.length) return [];
 
     const now = new Date();
     const cutoff = new Date();
+
     switch (selectedRange) {
       case "1W":
         cutoff.setDate(now.getDate() - 7);
@@ -111,15 +152,11 @@ export function RobinhoodStylePortfolioChart({
         cutoff.setFullYear(now.getFullYear() - 1);
         break;
       case "ALL":
-        return historicalValues.map((v) => ({
-          time: new Date(v.date).toLocaleDateString(),
-          equity: v.net_value,
-        }));
-      default:
-        return []; // 1D handled separately (live)
+        cutoff.setFullYear(2000); // Show all data
+        break;
     }
 
-    return historicalValues
+    const filtered = historicalValues
       .filter((v) => new Date(v.date) >= cutoff)
       .map((v) => ({
         time: new Date(v.date).toLocaleDateString("en-US", {
@@ -128,26 +165,34 @@ export function RobinhoodStylePortfolioChart({
         }),
         equity: v.net_value,
       }));
-  }, [selectedRange, historicalValues]);
 
-  // 🎨 Select proper chart dataset
-  const chartData =
-    selectedRange === "1D"
-      ? liveHistory
-      : filteredHistory.length
-      ? filteredHistory
-      : historicalValues.map((v) => ({
-          time: new Date(v.date).toLocaleDateString(),
-          equity: v.net_value,
-        }));
+    // If no data in the selected range, show all available data
+    if (filtered.length === 0 && historicalValues.length > 0) {
+      return historicalValues.map((v) => ({
+        time: new Date(v.date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+        equity: v.net_value,
+      }));
+    }
 
-  // 📈 Compute performance change
+    return filtered;
+  }, [
+    selectedRange,
+    historicalValues,
+    liveDataPoints,
+    isWebSocketConnected,
+    todayStartValue,
+  ]);
+
+  // Calculate performance metrics
   const current = chartData[chartData.length - 1];
   const first = chartData[0];
   const diff = current && first ? current.equity - first.equity : 0;
-  const pct = first ? (diff / first.equity) * 100 : 0;
+  const pct = first && first.equity !== 0 ? (diff / first.equity) * 100 : 0;
 
-  // 📊 Smart Y scaling
+  // Smart Y-axis scaling
   const yDomain = useMemo(() => {
     if (!chartData.length) return ["auto", "auto"];
     const vals = chartData.map((p) => p.equity);
@@ -160,13 +205,9 @@ export function RobinhoodStylePortfolioChart({
   return (
     <Card className="pt-0">
       <CardHeader className="border-b pb-4">
-        <CardTitle className="text-xl font-semibold">
-          Portfolio Value
-        </CardTitle>
+        <CardTitle className="text-xl font-semibold">Portfolio Value</CardTitle>
         <CardDescription>
-          {current
-            ? `$${current.equity.toFixed(2)}`
-            : "Loading data..."}{" "}
+          {current ? `$${current.equity.toFixed(2)}` : "Loading data..."}{" "}
           {diff !== 0 && (
             <span
               className={`ml-2 font-semibold ${
@@ -180,7 +221,7 @@ export function RobinhoodStylePortfolioChart({
           )}
         </CardDescription>
 
-        {/* ⏱ Range Selector */}
+        {/* Time Range Selector */}
         <div className="mt-4 flex items-center gap-2">
           {TIME_RANGES.map((range) => (
             <Button
@@ -198,11 +239,14 @@ export function RobinhoodStylePortfolioChart({
 
       <CardContent className="px-2 pt-6 sm:px-6">
         {!chartData.length ? (
-          <div className="flex h-[250px] items-center justify-center text-muted-foreground">
+          <div className="text-muted-foreground flex h-[250px] items-center justify-center">
             Loading chart...
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+          <ChartContainer
+            config={chartConfig}
+            className="aspect-auto h-[250px] w-full"
+          >
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="fillEquity" x1="0" y1="0" x2="0" y2="1">
