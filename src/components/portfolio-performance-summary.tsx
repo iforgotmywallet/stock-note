@@ -27,8 +27,6 @@ interface PerformanceSummaryProps {
   positions: PortfolioPosition[];
   portfolioLeverage?: number; // e.g., 4.0
   portfolioTickers?: string[]; // Configured tickers in the portfolio
-  livePrices?: Record<string, number>; // ticker -> live price from WebSocket
-  priceTimestamps?: Record<string, number>; // ticker -> timestamp of last update
   isWebSocketConnected?: boolean; // Whether WebSocket is actively connected
 }
 
@@ -52,15 +50,12 @@ export function PortfolioPerformanceSummary({
   positions,
   portfolioLeverage = 1.0,
   portfolioTickers = [],
-  livePrices,
-  priceTimestamps,
   isWebSocketConnected = false,
 }: PerformanceSummaryProps) {
   const STARTING_CAPITAL = 100_000;
 
-  // Determine if we're using live prices - must have both prices AND active connection
-  const usingLivePrices = isWebSocketConnected && livePrices && Object.keys(livePrices).length > 0;
-  const priceSource: "websocket" | "http" = usingLivePrices
+  // Determine price source from positions
+  const priceSource: "websocket" | "http" = isWebSocketConnected
     ? "websocket"
     : "http";
 
@@ -79,19 +74,13 @@ export function PortfolioPerformanceSummary({
       let lastUpdate: Date | null = null;
 
       for (const p of positions) {
-        // Prefer live prices over stored last_price
-        const price = (livePrices && livePrices[p.ticker]) ?? p.last_price ?? 0;
+        // Use last_price from position (already merged with live prices)
+        const price = p.last_price ?? 0;
         if (!price || p.shares === 0) continue;
         const abs = Math.abs(p.shares);
 
-        // Use price timestamp if available from WebSocket, otherwise use position updated_at
-        let updatedAt: Date;
-        if (priceTimestamps && priceTimestamps[p.ticker] !== undefined) {
-          updatedAt = new Date(priceTimestamps[p.ticker]!);
-        } else {
-          updatedAt = new Date(p.updated_at);
-        }
-
+        // Track last update time
+        const updatedAt = new Date(p.updated_at);
         if (
           !isNaN(updatedAt.getTime()) &&
           (!lastUpdate || updatedAt > lastUpdate)
@@ -159,7 +148,7 @@ export function PortfolioPerformanceSummary({
     };
 
     return calculateMetrics(positions || [], portfolioLeverage);
-  }, [positions, portfolioLeverage, livePrices, priceTimestamps]);
+  }, [positions, portfolioLeverage]);
 
   // 🧾 Formatting helpers (typed)
   const fmtCurrency = (v: number): string =>

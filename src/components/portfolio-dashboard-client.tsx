@@ -361,8 +361,6 @@ export function PortfolioDashboardClient({
           positions={positionsWithLivePrices}
           portfolioLeverage={portfolioLeverage}
           portfolioTickers={portfolioTickers}
-          livePrices={livePrices}
-          priceTimestamps={priceTimestamps}
           isWebSocketConnected={connectionState.connected}
         />
       </PortfolioDashboardErrorBoundary>
@@ -370,8 +368,7 @@ export function PortfolioDashboardClient({
       {/* Live Portfolio Chart with Error Boundary */}
       <PortfolioDashboardErrorBoundary>
         <RobinhoodStylePortfolioChart
-          positions={positions}
-          livePrices={livePrices}
+          positions={positionsWithLivePrices}
           historicalValues={dailyValues.map((v) => ({
             date: v.date.toISOString(),
             net_value: v.net_value,
@@ -408,7 +405,6 @@ export function PortfolioDashboardClient({
           <PortfolioHoldingsTable
             positions={positionsWithLivePrices}
             portfolioName={portfolioName}
-            livePrices={livePrices}
             priceSource={
               connectionState.connected && Object.keys(livePrices).length > 0
                 ? "websocket"

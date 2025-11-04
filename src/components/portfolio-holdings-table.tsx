@@ -231,7 +231,6 @@ interface PortfolioHoldingsTableProps {
   error?: string | null;
   onRetry?: () => void;
   portfolioName?: string;
-  livePrices?: Record<string, number>;
   priceSource?: "websocket" | "http";
 }
 
@@ -242,62 +241,19 @@ export function PortfolioHoldingsTable({
   error = null,
   onRetry,
   portfolioName = "Portfolio",
-  livePrices,
   priceSource = "http",
 }: PortfolioHoldingsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "ticker", desc: false }, // Default sort by ticker ascending
   ]);
 
-  // Determine if we're using live prices - must have both WebSocket connection AND price data
-  const isUsingLivePrices = priceSource === "websocket" && livePrices && Object.keys(livePrices).length > 0;
-
-  // Merge live prices with positions data for accurate real-time P/L calculations
-  // Filter out positions with 0 shares
-  const positionsWithLivePrices = React.useMemo(() => {
-    // Filter out positions with 0 shares first
-    const activePositions = positions.filter(
-      (position) => position.shares !== 0,
-    );
-
-    // Only use live prices if WebSocket is connected AND we have price data
-    if (!isUsingLivePrices) {
-      return activePositions.map((position) => ({
-        ...position,
-        price_source: position.last_price ? ("stored" as const) : undefined,
-      }));
-    }
-
-    return activePositions.map((position) => {
-      const livePrice = livePrices![position.ticker];
-
-      // If we have a live price, recalculate P/L metrics
-      if (livePrice !== undefined && livePrice > 0) {
-        const currentValue = position.shares * livePrice;
-        const costBasis = position.shares * position.avg_cost;
-        const profitLoss = currentValue - costBasis;
-        const profitLossPct =
-          costBasis !== 0 ? (profitLoss / Math.abs(costBasis)) * 100 : 0;
-
-        return {
-          ...position,
-          last_price: livePrice,
-          profit_loss: profitLoss,
-          profit_loss_pct: profitLossPct,
-          price_source: "live" as const,
-        };
-      }
-
-      // Otherwise, use stored price with appropriate indicator
-      return {
-        ...position,
-        price_source: position.last_price ? ("stored" as const) : undefined,
-      };
-    });
-  }, [positions, livePrices, isUsingLivePrices]);
+  // Filter out positions with 0 shares (positions already have live prices merged)
+  const activePositions = React.useMemo(() => {
+    return positions.filter((position) => position.shares !== 0);
+  }, [positions]);
 
   const table = useReactTable({
-    data: positionsWithLivePrices,
+    data: activePositions,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),

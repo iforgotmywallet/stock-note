@@ -21,6 +21,7 @@ interface PortfolioPosition {
   ticker: string;
   shares: number;
   avg_cost: number;
+  last_price?: number | null;
 }
 
 interface HistoricalValue {
@@ -30,7 +31,6 @@ interface HistoricalValue {
 
 interface LivePortfolioChartProps {
   positions: PortfolioPosition[];
-  livePrices: Record<string, number>;
   historicalValues?: HistoricalValue[];
   startingEquity?: number;
   isWebSocketConnected?: boolean;
@@ -51,7 +51,6 @@ type TimeRange = (typeof TIME_RANGES)[number];
 
 export function RobinhoodStylePortfolioChart({
   positions,
-  livePrices,
   historicalValues = [],
   startingEquity = 100000,
   isWebSocketConnected = false,
@@ -59,17 +58,37 @@ export function RobinhoodStylePortfolioChart({
   const [selectedRange, setSelectedRange] = useState<TimeRange>("1D");
   const [liveDataPoints, setLiveDataPoints] = useState<ChartDataPoint[]>([]);
 
-  // Compute current equity from live prices
+  // Compute current equity from positions (matches summary calculation)
   const computeEquity = useMemo(() => {
-    return (prices: Record<string, number>) => {
-      if (!positions.length) return startingEquity;
-      let unrealized = 0;
-      for (const pos of positions) {
-        const price = prices[pos.ticker] ?? pos.avg_cost;
-        unrealized += (price - pos.avg_cost) * pos.shares;
+    if (!positions.length) return startingEquity;
+    
+    let longValue = 0;
+    let shortValue = 0;
+    let longCost = 0;
+    let shortProceeds = 0;
+
+    for (const pos of positions) {
+      const price = pos.last_price ?? pos.avg_cost;
+      if (!price || pos.shares === 0) continue;
+      
+      const abs = Math.abs(pos.shares);
+      
+      if (pos.shares > 0) {
+        // Long position
+        longValue += abs * price;
+        longCost += abs * pos.avg_cost;
+      } else {
+        // Short position
+        shortValue += abs * price;
+        shortProceeds += abs * pos.avg_cost;
       }
-      return startingEquity + unrealized;
-    };
+    }
+
+    // Cash after establishing positions
+    const cash = startingEquity - longCost + shortProceeds;
+    
+    // Equity = cash + longValue - shortValue
+    return cash + longValue - shortValue;
   }, [positions, startingEquity]);
 
   // Get today's starting value from historical data
@@ -87,17 +106,13 @@ export function RobinhoodStylePortfolioChart({
     return sortedValues[0]?.net_value ?? startingEquity;
   }, [historicalValues, startingEquity]);
 
-  // Update live data points when WebSocket prices change (1D only)
+  // Update live data points when positions change (1D only)
   useEffect(() => {
-    if (
-      selectedRange !== "1D" ||
-      !isWebSocketConnected ||
-      !Object.keys(livePrices).length
-    ) {
+    if (selectedRange !== "1D" || !isWebSocketConnected) {
       return;
     }
 
-    const equity = computeEquity(livePrices);
+    const equity = computeEquity;
     const now = Date.now();
     const time = new Date(now).toLocaleTimeString("en-US", {
       hour: "numeric",
@@ -113,7 +128,7 @@ export function RobinhoodStylePortfolioChart({
       // Add new point
       return [...filtered, { time, equity, timestamp: now }];
     });
-  }, [livePrices, computeEquity, selectedRange, isWebSocketConnected]);
+  }, [positions, computeEquity, selectedRange, isWebSocketConnected]);
 
   // Filter historical data by selected time range
   const chartData = useMemo(() => {
@@ -204,7 +219,7 @@ export function RobinhoodStylePortfolioChart({
 
   return (
     <Card className="pt-0">
-      <CardHeader className="border-b pb-4">
+      <CardHeader className="border-b pt-6 pb-4">
         <CardTitle className="text-xl font-semibold">Portfolio Value</CardTitle>
         <CardDescription>
           {current ? `$${current.equity.toFixed(2)}` : "Loading data..."}{" "}
