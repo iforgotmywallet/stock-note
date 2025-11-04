@@ -3,10 +3,11 @@ import { inngest } from "../../../inngest/client";
 import {
   generateAnalysis,
   dailyPortfolioCron,
+  recordPortfolioDailyValue,
 } from "~/inngest/functions/index";
 
 // Create an API that serves all functions
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [generateAnalysis, dailyPortfolioCron],
+  functions: [generateAnalysis, dailyPortfolioCron, recordPortfolioDailyValue],
 });

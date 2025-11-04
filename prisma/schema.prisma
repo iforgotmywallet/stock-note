@@ -223,6 +223,7 @@ model PortfolioDailyValue {
   short_value      Float     @default(0)
   net_value        Float     @default(0)
   total_return_pct Float?
+  daily_change_pct Float?    
   created_at       DateTime  @default(now())
   portfolio        Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
 }
