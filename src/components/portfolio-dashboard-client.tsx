@@ -24,6 +24,13 @@ interface PortfolioDashboardClientProps {
   portfolioTickers: string[];
   initialPositions: PortfolioPositionWithMetrics[];
   initialActions: PortfolioActionWithDetails[];
+  dailyValues?: Array<{
+    date: Date;
+    net_value: number;
+    cash_balance?: number;
+    long_value?: number;
+    short_value?: number;
+  }>;
 }
 
 /**
@@ -36,6 +43,7 @@ export function PortfolioDashboardClient({
   portfolioTickers,
   initialPositions,
   initialActions,
+  dailyValues = [],
 }: PortfolioDashboardClientProps) {
   const [positions, setPositions] = useState(initialPositions);
   const [actions, setActions] = useState(initialActions);
@@ -212,8 +220,9 @@ export function PortfolioDashboardClient({
 
       // Check if we got rate limited
       const rateLimitedCount = data.errors
-        ? Object.values(data.errors).filter((err: any) => err === "Rate limited")
-            .length
+        ? Object.values(data.errors).filter(
+            (err: any) => err === "Rate limited",
+          ).length
         : 0;
 
       if (rateLimitedCount > 0) {
@@ -255,7 +264,9 @@ export function PortfolioDashboardClient({
 
         if (updatedCount > 0) {
           setLastUpdated(new Date());
-          console.log(`Updated ${updatedCount}/${tickers.length} prices via HTTP`);
+          console.log(
+            `Updated ${updatedCount}/${tickers.length} prices via HTTP`,
+          );
         }
       }
     } catch (error) {
@@ -309,18 +320,22 @@ export function PortfolioDashboardClient({
     // Check if we're during market hours (9:30 AM - 4:00 PM ET, Mon-Fri)
     const isMarketHours = () => {
       const now = new Date();
-      const et = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+      const et = new Date(
+        now.toLocaleString("en-US", { timeZone: "America/New_York" }),
+      );
       const day = et.getDay(); // 0 = Sunday, 6 = Saturday
       const hour = et.getHours();
       const minute = et.getMinutes();
       const timeInMinutes = hour * 60 + minute;
-      
+
       // Market hours: Mon-Fri, 9:30 AM - 4:00 PM ET
       const isWeekday = day >= 1 && day <= 5;
       const marketOpen = 9 * 60 + 30; // 9:30 AM
       const marketClose = 16 * 60; // 4:00 PM
-      
-      return isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+
+      return (
+        isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose
+      );
     };
 
     if (!isMarketHours()) {
@@ -342,9 +357,7 @@ export function PortfolioDashboardClient({
         );
         fetchLivePricesHTTP();
       } else {
-        console.log(
-          "[Portfolio Dashboard] Market closed - skipping HTTP poll",
-        );
+        console.log("[Portfolio Dashboard] Market closed - skipping HTTP poll");
       }
     }, 60000); // 60 seconds
 
@@ -375,11 +388,17 @@ export function PortfolioDashboardClient({
       {/* Live Portfolio Chart with Error Boundary */}
       <PortfolioDashboardErrorBoundary>
         <LivePortfolioChart
-          positions={positionsWithLivePrices}
+          positions={positions}
           livePrices={livePrices}
+          historicalValues={dailyValues.map((v) => ({
+            date: v.date.toISOString(),
+            net_value: v.net_value,
+            cash_balance: v.cash_balance,
+            long_value: v.long_value,
+            short_value: v.short_value,
+          }))}
           portfolioLeverage={portfolioLeverage}
           isWebSocketConnected={connectionState.connected}
-          initialPrices={initialPricesFromDB}
         />
       </PortfolioDashboardErrorBoundary>
 
