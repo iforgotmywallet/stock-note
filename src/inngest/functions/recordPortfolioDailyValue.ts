@@ -64,13 +64,6 @@ export const recordPortfolioDailyValue = inngest.createFunction(
 
     for (const portfolio of portfolios) {
       await step.run(`Process portfolio ${portfolio.name}`, async () => {
-        // Skip if not scheduled for today
-        if (!portfolio.days_of_week.includes(weekday)) {
-          console.log(
-            `⏭ Skipped ${portfolio.name} — not active on ${weekday}`,
-          );
-          return;
-        }
 
         const positions = await db.portfolioPosition.findMany({
           where: { portfolioId: portfolio.id },
