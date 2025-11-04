@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { PortfolioPerformanceSummary } from "~/components/portfolio-performance-summary";
 import { PortfolioHoldingsTable } from "~/components/portfolio-holdings-table";
 import { PortfolioRecentActions } from "~/components/portfolio-recent-actions";
-import { LivePortfolioChart } from "~/components/portfolio-live-chart";
 import {
   PortfolioDashboardErrorBoundary,
   HoldingsTableErrorFallback,
@@ -16,6 +15,7 @@ import type {
   PortfolioPositionWithMetrics,
   PortfolioActionWithDetails,
 } from "~/lib/database/portfolios";
+import { RobinhoodStylePortfolioChart } from "./portfolio-live-chart";
 
 interface PortfolioDashboardClientProps {
   portfolioId: string;
@@ -387,7 +387,7 @@ export function PortfolioDashboardClient({
 
       {/* Live Portfolio Chart with Error Boundary */}
       <PortfolioDashboardErrorBoundary>
-        <LivePortfolioChart
+        <RobinhoodStylePortfolioChart
           positions={positions}
           livePrices={livePrices}
           historicalValues={dailyValues.map((v) => ({
@@ -398,6 +398,7 @@ export function PortfolioDashboardClient({
             short_value: v.short_value,
           }))}
           portfolioLeverage={portfolioLeverage}
+          startingEquity={100000}
           isWebSocketConnected={connectionState.connected}
         />
       </PortfolioDashboardErrorBoundary>
