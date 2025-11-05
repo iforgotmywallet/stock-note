@@ -28,6 +28,7 @@ interface PerformanceSummaryProps {
   portfolioLeverage?: number; // e.g., 4.0
   portfolioTickers?: string[]; // Configured tickers in the portfolio
   isWebSocketConnected?: boolean; // Whether WebSocket is actively connected
+  isMarketOpen?: boolean; // Whether market is currently open
 }
 
 interface PerformanceMetrics {
@@ -51,6 +52,7 @@ export function PortfolioPerformanceSummary({
   portfolioLeverage = 1.0,
   portfolioTickers = [],
   isWebSocketConnected = false,
+  isMarketOpen = false,
 }: PerformanceSummaryProps) {
   const STARTING_CAPITAL = 100_000;
 
@@ -196,7 +198,9 @@ export function PortfolioPerformanceSummary({
                 Live
               </span>
             ) : (
-              "HTTP"
+              <span className="flex items-center gap-1">
+                {isMarketOpen ? "Connecting..." : "Market Closed"}
+              </span>
             )}
           </Badge>
         </div>

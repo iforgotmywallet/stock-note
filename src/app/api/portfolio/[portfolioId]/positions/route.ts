@@ -161,7 +161,7 @@ export async function GET(
         profit_loss,
         profit_loss_pct,
         // Add metadata about price source
-        price_source: livePrice ? ('live' as const) : ('http' as const),
+        price_source: livePrice ? ('live' as const) : undefined,
         price_updated_at: livePrice ? new Date() : position.updated_at,
       };
     });

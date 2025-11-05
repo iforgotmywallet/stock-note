@@ -9,7 +9,7 @@ import {
   HoldingsTableErrorFallback,
   RecentActionsErrorFallback,
 } from "~/components/portfolio-dashboard-error-boundary";
-import { useFinnhubWebSocket } from "~/hooks/use-finnhub-websocket";
+import { usePortfolioPrices } from "~/hooks/use-portfolio-prices";
 
 import type {
   PortfolioPositionWithMetrics,
@@ -49,9 +49,8 @@ export function PortfolioDashboardClient({
   const [actions, setActions] = useState(initialActions);
   const [actionsLoading, setActionsLoading] = useState(false);
   const [actionsError, setActionsError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Extract unique ticker symbols from positions for WebSocket subscription
+  // Extract unique ticker symbols from positions
   const tickers = useMemo(() => {
     const uniqueTickers = new Set<string>();
     positions.forEach((position) => {
@@ -62,21 +61,22 @@ export function PortfolioDashboardClient({
     return Array.from(uniqueTickers);
   }, [positions]);
 
-  // Initialize WebSocket connection for real-time price updates
+  // Use the new hook that switches between WebSocket and HTTP based on market hours
   const {
     prices: livePrices,
     priceTimestamps,
-    connectionState,
-    subscribe,
-    unsubscribe,
-    shouldFallbackToHttp,
-  } = useFinnhubWebSocket(tickers);
+    priceSource,
+    isMarketOpen,
+  } = usePortfolioPrices({
+    tickers,
+    enabled: true,
+    httpPollingInterval: 1000, // 1 second interval for HTTP polling
+  });
 
-  // Track previous portfolio ID and tickers for cleanup on portfolio change
+  // Track previous portfolio ID for cleanup on portfolio change
   const prevPortfolioIdRef = useRef<string>(portfolioId);
-  const prevTickersRef = useRef<string[]>(tickers);
 
-  // Handle portfolio changes - unsubscribe from old tickers and subscribe to new ones
+  // Handle portfolio changes - reset positions and actions
   useEffect(() => {
     // Check if portfolio has changed
     if (prevPortfolioIdRef.current !== portfolioId) {
@@ -87,152 +87,22 @@ export function PortfolioDashboardClient({
         portfolioId,
       );
 
-      // Get previous tickers
-      const oldTickers = prevTickersRef.current;
-
-      // Unsubscribe from previous portfolio's tickers
-      if (oldTickers.length > 0 && connectionState.connected) {
-        console.log(
-          "[Portfolio Dashboard] Unsubscribing from old tickers:",
-          oldTickers,
-        );
-        unsubscribe(oldTickers);
-      }
-
       // Update positions to the new portfolio's initial positions
       // This ensures we don't show stale data from the previous portfolio
       setPositions(initialPositions);
       setActions(initialActions);
 
-      // Subscribe to new portfolio's tickers
-      if (tickers.length > 0 && connectionState.connected) {
-        console.log(
-          "[Portfolio Dashboard] Subscribing to new tickers:",
-          tickers,
-        );
-        subscribe(tickers);
-      }
-
-      // Update refs
+      // Update ref
       prevPortfolioIdRef.current = portfolioId;
-      prevTickersRef.current = tickers;
-    } else if (
-      prevTickersRef.current.length !== tickers.length ||
-      !prevTickersRef.current.every(
-        (ticker, index) => ticker === tickers[index],
-      )
-    ) {
-      // Tickers changed within the same portfolio (e.g., positions added/removed)
-      const oldTickers = prevTickersRef.current;
-      const newTickers = tickers;
-
-      // Find tickers to unsubscribe (in old but not in new)
-      const tickersToUnsubscribe = oldTickers.filter(
-        (ticker) => !newTickers.includes(ticker),
-      );
-
-      // Find tickers to subscribe (in new but not in old)
-      const tickersToSubscribe = newTickers.filter(
-        (ticker) => !oldTickers.includes(ticker),
-      );
-
-      if (tickersToUnsubscribe.length > 0 && connectionState.connected) {
-        console.log(
-          "[Portfolio Dashboard] Unsubscribing from removed tickers:",
-          tickersToUnsubscribe,
-        );
-        unsubscribe(tickersToUnsubscribe);
-      }
-
-      if (tickersToSubscribe.length > 0 && connectionState.connected) {
-        console.log(
-          "[Portfolio Dashboard] Subscribing to new tickers:",
-          tickersToSubscribe,
-        );
-        subscribe(tickersToSubscribe);
-      }
-
-      // Update ticker ref
-      prevTickersRef.current = tickers;
     }
-  }, [portfolioId, tickers, connectionState.connected, subscribe, unsubscribe, initialPositions, initialActions]);
+  }, [portfolioId, initialPositions, initialActions]);
 
-  // Fetch HTTP prices immediately on mount (PRIMARY - for fast initial load)
-  useEffect(() => {
-    const fetchInitialPrices = async () => {
-      if (tickers.length === 0) return;
-
-      console.log(
-        "[Portfolio Dashboard] Fetching initial HTTP prices for all tickers:",
-        tickers
-      );
-
-      try {
-        const tickersParam = tickers.join(",");
-        const response = await fetch(
-          `/api/portfolio/prices?tickers=${tickersParam}`
-        );
-
-        if (!response.ok) {
-          console.warn("Failed to fetch initial HTTP prices:", response.statusText);
-          return;
-        }
-
-        const data = await response.json();
-
-        if (data.prices) {
-          let updatedCount = 0;
-
-          setPositions((prev) =>
-            prev.map((position) => {
-              const httpPrice = data.prices[position.ticker];
-
-              if (httpPrice && httpPrice > 0) {
-                updatedCount++;
-                const currentValue = position.shares * httpPrice;
-                const costBasis = position.shares * position.avg_cost;
-                const profitLoss = currentValue - costBasis;
-                const profitLossPct =
-                  costBasis !== 0
-                    ? (profitLoss / Math.abs(costBasis)) * 100
-                    : 0;
-
-                return {
-                  ...position,
-                  last_price: httpPrice,
-                  profit_loss: profitLoss,
-                  profit_loss_pct: profitLossPct,
-                  price_source: "http" as const,
-                  updated_at: new Date(),
-                };
-              }
-
-              return position;
-            })
-          );
-
-          if (updatedCount > 0) {
-            setLastUpdated(new Date());
-            console.log(
-              `[Portfolio Dashboard] Updated ${updatedCount}/${tickers.length} prices via initial HTTP fetch`
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching initial HTTP prices:", error);
-      }
-    };
-
-    // Fetch immediately on mount
-    fetchInitialPrices();
-  }, [tickers]);
-
-  // Merge prices: WebSocket overrides HTTP prices for real-time updates
+  // Merge live prices (WebSocket or HTTP) with positions
   const positionsWithLivePrices = useMemo(() => {
     return positions.map((position) => {
       const livePrice = livePrices[position.ticker];
       
-      // WebSocket price (real-time) - overrides HTTP
+      // Live price available (from WebSocket or HTTP)
       if (livePrice !== undefined) {
         const currentValue = position.shares * livePrice;
         const costBasis = position.shares * position.avg_cost;
@@ -245,93 +115,17 @@ export function PortfolioDashboardClient({
           last_price: livePrice,
           profit_loss: profitLoss,
           profit_loss_pct: profitLossPct,
-          price_source: "live" as const,
+          price_source: priceSource === 'websocket' ? "live" as const : "delayed" as const,
           price_updated_at: new Date(
             priceTimestamps[position.ticker] || Date.now(),
           ),
         };
       }
       
-      // HTTP price (from initial fetch or polling)
+      // No price update available
       return position;
     });
-  }, [positions, livePrices, priceTimestamps]);
-
-  // Fetch updated prices from Finnhub HTTP API (Fallback 1)
-  const fetchLivePricesHTTP = async () => {
-    if (tickers.length === 0) return;
-
-    try {
-      const tickersParam = tickers.join(",");
-      const response = await fetch(
-        `/api/portfolio/prices?tickers=${tickersParam}`,
-      );
-
-      if (!response.ok) {
-        console.warn(
-          "Failed to fetch live prices via HTTP:",
-          response.statusText,
-        );
-        return;
-      }
-
-      const data = await response.json();
-
-      // Check if we got rate limited
-      const rateLimitedCount = data.errors
-        ? Object.values(data.errors).filter(
-            (err: any) => err === "Rate limited",
-          ).length
-        : 0;
-
-      if (rateLimitedCount > 0) {
-        console.warn(
-          `Rate limited for ${rateLimitedCount} tickers - keeping existing prices`,
-        );
-      }
-
-      // Update positions with HTTP-fetched prices
-      if (data.prices) {
-        let updatedCount = 0;
-
-        setPositions((prev) =>
-          prev.map((position) => {
-            const httpPrice = data.prices[position.ticker];
-
-            if (httpPrice && httpPrice > 0) {
-              updatedCount++;
-              // Recalculate P&L with HTTP price
-              const currentValue = position.shares * httpPrice;
-              const costBasis = position.shares * position.avg_cost;
-              const profitLoss = currentValue - costBasis;
-              const profitLossPct =
-                costBasis !== 0 ? (profitLoss / Math.abs(costBasis)) * 100 : 0;
-
-              return {
-                ...position,
-                last_price: httpPrice,
-                profit_loss: profitLoss,
-                profit_loss_pct: profitLossPct,
-                price_source: "http" as const,
-                updated_at: new Date(),
-              };
-            }
-
-            return position;
-          }),
-        );
-
-        if (updatedCount > 0) {
-          setLastUpdated(new Date());
-          console.log(
-            `Updated ${updatedCount}/${tickers.length} prices via HTTP`,
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching live prices via HTTP:", error);
-    }
-  };
+  }, [positions, livePrices, priceTimestamps, priceSource]);
 
   // Fetch updated actions data
   const fetchActions = async () => {
@@ -365,66 +159,6 @@ export function PortfolioDashboardClient({
     fetchActions();
   };
 
-  // HTTP polling when WebSocket completely fails (only during market hours)
-  useEffect(() => {
-    if (!shouldFallbackToHttp) {
-      return;
-    }
-
-    // Check if we're during market hours (9:30 AM - 4:00 PM ET, Mon-Fri)
-    const isMarketHours = () => {
-      const now = new Date();
-      const et = new Date(
-        now.toLocaleString("en-US", { timeZone: "America/New_York" }),
-      );
-      const day = et.getDay(); // 0 = Sunday, 6 = Saturday
-      const hour = et.getHours();
-      const minute = et.getMinutes();
-      const timeInMinutes = hour * 60 + minute;
-
-      // Market hours: Mon-Fri, 9:30 AM - 4:00 PM ET
-      const isWeekday = day >= 1 && day <= 5;
-      const marketOpen = 9 * 60 + 30; // 9:30 AM
-      const marketClose = 16 * 60; // 4:00 PM
-
-      return (
-        isWeekday && timeInMinutes >= marketOpen && timeInMinutes < marketClose
-      );
-    };
-
-    if (!isMarketHours()) {
-      console.log(
-        "[Portfolio Dashboard] Outside market hours - using database prices only",
-      );
-      return; // Don't poll outside market hours
-    }
-
-    console.log(
-      "[Portfolio Dashboard] WebSocket failed - starting HTTP polling",
-    );
-
-    // Start polling every 60 seconds to avoid rate limits
-    const pollInterval = setInterval(() => {
-      if (isMarketHours()) {
-        console.log(
-          "[Portfolio Dashboard] HTTP polling: fetching updated prices",
-        );
-        fetchLivePricesHTTP();
-      } else {
-        console.log("[Portfolio Dashboard] Market closed - skipping HTTP poll");
-      }
-    }, 60000); // 60 seconds
-
-    // Initial fetch when fallback is triggered
-    fetchLivePricesHTTP();
-
-    // Cleanup interval on unmount or when WebSocket reconnects
-    return () => {
-      console.log("[Portfolio Dashboard] Stopping HTTP polling");
-      clearInterval(pollInterval);
-    };
-  }, [shouldFallbackToHttp, portfolioId, tickers]);
-
   return (
     <>
       {/* Performance Summary Card with Error Boundary */}
@@ -433,7 +167,8 @@ export function PortfolioDashboardClient({
           positions={positionsWithLivePrices}
           portfolioLeverage={portfolioLeverage}
           portfolioTickers={portfolioTickers}
-          isWebSocketConnected={connectionState.connected}
+          isWebSocketConnected={priceSource === 'websocket'}
+          isMarketOpen={isMarketOpen}
         />
       </PortfolioDashboardErrorBoundary>
 
@@ -446,7 +181,7 @@ export function PortfolioDashboardClient({
             net_value: v.net_value,
           }))}
           startingEquity={100000}
-          isWebSocketConnected={connectionState.connected}
+          isWebSocketConnected={priceSource === 'websocket'}
         />
       </PortfolioDashboardErrorBoundary>
 
@@ -457,13 +192,13 @@ export function PortfolioDashboardClient({
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Current Holdings
             </h2>
-            {lastUpdated && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Last updated: {lastUpdated.toLocaleTimeString()}
-              </p>
-            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {isMarketOpen 
+                ? `Market Open - Live prices via ${priceSource === 'websocket' ? 'WebSocket' : 'connecting...'}`
+                : `Market Closed - Prices via HTTP polling`
+              }
+            </p>
           </div>
-
         </div>
 
         <PortfolioDashboardErrorBoundary
@@ -477,11 +212,7 @@ export function PortfolioDashboardClient({
           <PortfolioHoldingsTable
             positions={positionsWithLivePrices}
             portfolioName={portfolioName}
-            priceSource={
-              connectionState.connected && Object.keys(livePrices).length > 0
-                ? "websocket"
-                : "http"
-            }
+            priceSource={priceSource === 'websocket' ? 'websocket' : 'http'}
           />
         </PortfolioDashboardErrorBoundary>
       </div>
