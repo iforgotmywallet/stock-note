@@ -41,7 +41,7 @@ export function getNextMarketOpen(): Date {
     now.toLocaleString('en-US', { timeZone: 'America/New_York' })
   );
   
-  let nextOpen = new Date(estTime);
+  const nextOpen = new Date(estTime);
   nextOpen.setHours(9, 30, 0, 0);
   
   // If market already opened today or it's after market close, move to next day
