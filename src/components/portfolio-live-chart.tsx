@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -262,21 +262,7 @@ export function RobinhoodStylePortfolioChart({
             config={chartConfig}
             className="aspect-auto h-[250px] w-full"
           >
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="fillEquity" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="var(--color-equity)"
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-equity)"
-                    stopOpacity={0.05}
-                  />
-                </linearGradient>
-              </defs>
+            <LineChart data={chartData}>
               <CartesianGrid vertical={false} />
               <XAxis
                 dataKey="time"
@@ -295,14 +281,14 @@ export function RobinhoodStylePortfolioChart({
                   />
                 }
               />
-              <Area
+              <Line
                 type="monotone"
                 dataKey="equity"
                 stroke="var(--color-equity)"
-                fill="url(#fillEquity)"
-                fillOpacity={0.3}
+                strokeWidth={2}
+                dot={false}
               />
-            </AreaChart>
+            </LineChart>
           </ChartContainer>
         )}
       </CardContent>
