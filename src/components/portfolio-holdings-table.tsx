@@ -47,7 +47,7 @@ export interface PortfolioPositionWithMetrics {
   updated_at: Date;
   profit_loss: number;
   profit_loss_pct: number;
-  price_source?: "live" | "stored";
+  price_source?: "live" | "http" | "stored";
   price_updated_at?: Date;
 }
 
@@ -157,7 +157,13 @@ const columns: ColumnDef<PortfolioPositionWithMetrics>[] = [
                   />
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p className="text-xs">{isLive ? "Live" : "Cached"}</p>
+                  <p className="text-xs">
+                    {isLive 
+                      ? "Live (WebSocket)" 
+                      : priceSource === "http" 
+                        ? "HTTP API" 
+                        : "Cached"}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             )}

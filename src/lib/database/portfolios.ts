@@ -8,7 +8,7 @@ export interface PortfolioWithTickers extends Portfolio {
 export interface PortfolioPositionWithMetrics extends PortfolioPosition {
   profit_loss: number;
   profit_loss_pct: number;
-  price_source?: 'live' | 'stored';
+  price_source?: 'live' | 'http' | 'stored';
   price_updated_at?: Date;
 }
 

@@ -157,29 +157,24 @@ export function PortfolioDashboardClient({
     }
   }, [portfolioId, tickers, connectionState.connected, subscribe, unsubscribe, initialPositions, initialActions]);
 
-  // Fetch HTTP prices for tickers without WebSocket prices (synchronous fallback)
+  // Fetch HTTP prices immediately on mount (PRIMARY - for fast initial load)
   useEffect(() => {
-    const fetchMissingPrices = async () => {
-      // Find tickers that don't have live prices
-      const missingTickers = tickers.filter(
-        (ticker) => livePrices[ticker] === undefined
-      );
-
-      if (missingTickers.length === 0) return;
+    const fetchInitialPrices = async () => {
+      if (tickers.length === 0) return;
 
       console.log(
-        "[Portfolio Dashboard] Fetching HTTP prices for tickers without WebSocket data:",
-        missingTickers
+        "[Portfolio Dashboard] Fetching initial HTTP prices for all tickers:",
+        tickers
       );
 
       try {
-        const tickersParam = missingTickers.join(",");
+        const tickersParam = tickers.join(",");
         const response = await fetch(
           `/api/portfolio/prices?tickers=${tickersParam}`
         );
 
         if (!response.ok) {
-          console.warn("Failed to fetch HTTP prices:", response.statusText);
+          console.warn("Failed to fetch initial HTTP prices:", response.statusText);
           return;
         }
 
@@ -190,11 +185,6 @@ export function PortfolioDashboardClient({
 
           setPositions((prev) =>
             prev.map((position) => {
-              // Only update if we don't have a WebSocket price
-              if (livePrices[position.ticker] !== undefined) {
-                return position;
-              }
-
               const httpPrice = data.prices[position.ticker];
 
               if (httpPrice && httpPrice > 0) {
@@ -212,7 +202,7 @@ export function PortfolioDashboardClient({
                   last_price: httpPrice,
                   profit_loss: profitLoss,
                   profit_loss_pct: profitLossPct,
-                  price_source: "stored" as const,
+                  price_source: "http" as const,
                   updated_at: new Date(),
                 };
               }
@@ -224,27 +214,26 @@ export function PortfolioDashboardClient({
           if (updatedCount > 0) {
             setLastUpdated(new Date());
             console.log(
-              `[Portfolio Dashboard] Updated ${updatedCount}/${missingTickers.length} prices via HTTP fallback`
+              `[Portfolio Dashboard] Updated ${updatedCount}/${tickers.length} prices via initial HTTP fetch`
             );
           }
         }
       } catch (error) {
-        console.error("Error fetching HTTP fallback prices:", error);
+        console.error("Error fetching initial HTTP prices:", error);
       }
     };
 
-    // Only fetch if we have tickers and some are missing WebSocket prices
-    if (tickers.length > 0) {
-      fetchMissingPrices();
-    }
-  }, [tickers, livePrices]);
+    // Fetch immediately on mount
+    fetchInitialPrices();
+  }, [tickers]);
 
-  // Merge live prices with position data
+  // Merge prices: WebSocket overrides HTTP/DB prices for real-time updates
   const positionsWithLivePrices = useMemo(() => {
     return positions.map((position) => {
       const livePrice = livePrices[position.ticker];
+      
+      // TIER 1: WebSocket price (real-time) - overrides everything
       if (livePrice !== undefined) {
-        // Calculate updated metrics with live price
         const currentValue = position.shares * livePrice;
         const costBasis = position.shares * position.avg_cost;
         const profitLoss = currentValue - costBasis;
@@ -262,10 +251,16 @@ export function PortfolioDashboardClient({
           ),
         };
       }
-      // No live price - will be fetched via HTTP or use cached
+      
+      // TIER 2: HTTP or Database price
+      // Position already has price from HTTP fetch or DB
+      const source = position.last_price 
+        ? (position.price_source || "stored")
+        : undefined;
+      
       return {
         ...position,
-        price_source: position.last_price ? ("stored" as const) : undefined,
+        price_source: source as "live" | "http" | "stored" | undefined,
       };
     });
   }, [positions, livePrices, priceTimestamps]);
@@ -325,7 +320,7 @@ export function PortfolioDashboardClient({
                 last_price: httpPrice,
                 profit_loss: profitLoss,
                 profit_loss_pct: profitLossPct,
-                price_source: "stored" as const,
+                price_source: "http" as const,
                 updated_at: new Date(),
               };
             }
