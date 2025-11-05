@@ -3,6 +3,11 @@
 import { IconCoins, IconRefresh } from "@tabler/icons-react";
 import { useUserCredits } from "~/hooks/use-user-credits";
 import { Skeleton } from "~/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { authClient } from "~/lib/auth-client";
 
@@ -65,25 +70,30 @@ export function CreditDisplay({ userId, className }: CreditDisplayProps) {
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      <button
-        onClick={handleUpgrade}
-        className={cn(
-          "flex items-center gap-1.5 rounded-md px-2 py-1.5",
-          "text-muted-foreground text-sm",
-          "transition-colors duration-200",
-          "hover:bg-accent/50 hover:text-foreground",
-          "focus:ring-ring focus:ring-2 focus:ring-offset-2 focus:outline-none",
-          "cursor-pointer",
-        )}
-      >
-        <IconCoins className="h-4 w-4 shrink-0" />
-        {/* Desktop: Show full text */}
-        <span className="hidden font-medium sm:inline">
-          {credits} {credits === 1 ? "credit" : "credits"}
-        </span>
-        {/* Mobile: Show just the number */}
-        <span className="font-medium tabular-nums sm:hidden">{credits}</span>
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            disabled
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2 py-1.5",
+              "text-muted-foreground text-sm",
+              "transition-colors duration-200",
+              "cursor-not-allowed opacity-60",
+            )}
+          >
+            <IconCoins className="h-4 w-4 shrink-0" />
+            {/* Desktop: Show full text */}
+            <span className="hidden font-medium sm:inline">
+              {credits} {credits === 1 ? "credit" : "credits"}
+            </span>
+            {/* Mobile: Show just the number */}
+            <span className="font-medium tabular-nums sm:hidden">{credits}</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-xs">Purchase credits coming soon</p>
+        </TooltipContent>
+      </Tooltip>
       <button
         onClick={handleRefresh}
         disabled={loading}
