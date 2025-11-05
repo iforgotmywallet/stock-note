@@ -27,11 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { Skeleton } from "~/components/ui/skeleton";
 
@@ -47,7 +42,7 @@ export interface PortfolioPositionWithMetrics {
   updated_at: Date;
   profit_loss: number;
   profit_loss_pct: number;
-  price_source?: "live" | "http" | "stored";
+  price_source?: "live" | "http";
   price_updated_at?: Date;
 }
 
@@ -139,39 +134,13 @@ const columns: ColumnDef<PortfolioPositionWithMetrics>[] = [
     header: () => <div className="text-right">Last Price</div>,
     cell: ({ row }) => {
       const lastPrice = row.original.last_price;
-      const priceSource = row.original.price_source;
-      const isLive = priceSource === "live";
-
       return (
         <div className="text-right">
-          <div className="flex items-center justify-end gap-1.5">
-            {lastPrice ? formatCurrency(lastPrice) : "—"}
-            {priceSource && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div
-                    className={cn(
-                      "size-2 cursor-help rounded-full",
-                      isLive ? "animate-pulse bg-green-500" : "bg-orange-500",
-                    )}
-                  />
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p className="text-xs">
-                    {isLive 
-                      ? "Live (WebSocket)" 
-                      : priceSource === "http" 
-                        ? "HTTP API" 
-                        : "Cached"}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+          {lastPrice ? formatCurrency(lastPrice) : "—"}
         </div>
       );
     },
-    size: 140,
+    size: 120,
   },
   {
     accessorKey: "profit_loss",

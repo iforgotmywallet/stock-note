@@ -227,12 +227,12 @@ export function PortfolioDashboardClient({
     fetchInitialPrices();
   }, [tickers]);
 
-  // Merge prices: WebSocket overrides HTTP/DB prices for real-time updates
+  // Merge prices: WebSocket overrides HTTP prices for real-time updates
   const positionsWithLivePrices = useMemo(() => {
     return positions.map((position) => {
       const livePrice = livePrices[position.ticker];
       
-      // TIER 1: WebSocket price (real-time) - overrides everything
+      // WebSocket price (real-time) - overrides HTTP
       if (livePrice !== undefined) {
         const currentValue = position.shares * livePrice;
         const costBasis = position.shares * position.avg_cost;
@@ -252,16 +252,8 @@ export function PortfolioDashboardClient({
         };
       }
       
-      // TIER 2: HTTP or Database price
-      // Position already has price from HTTP fetch or DB
-      const source = position.last_price 
-        ? (position.price_source || "stored")
-        : undefined;
-      
-      return {
-        ...position,
-        price_source: source as "live" | "http" | "stored" | undefined,
-      };
+      // HTTP price (from initial fetch or polling)
+      return position;
     });
   }, [positions, livePrices, priceTimestamps]);
 
@@ -325,7 +317,6 @@ export function PortfolioDashboardClient({
               };
             }
 
-            // Fallback 2: Keep existing last_price from database
             return position;
           }),
         );
@@ -339,7 +330,6 @@ export function PortfolioDashboardClient({
       }
     } catch (error) {
       console.error("Error fetching live prices via HTTP:", error);
-      // Silently fail - positions will use Fallback 2 (database last_price)
     }
   };
 
