@@ -160,6 +160,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     name: string;
     email: string;
   } | null>(null);
+  const [portfolioCount, setPortfolioCount] = useState<number>(0);
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -183,6 +184,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     getCurrentUser();
   }, []);
 
+  useEffect(() => {
+    const fetchPortfolioCount = async () => {
+      if (!currentUser?.id) return;
+      
+      try {
+        const response = await fetch("/api/portfolio/count");
+        if (response.ok) {
+          const data = await response.json();
+          setPortfolioCount(data.count || 0);
+        }
+      } catch (error) {
+        console.error("Error fetching portfolio count:", error);
+      }
+    };
+
+    fetchPortfolioCount();
+
+    // Listen for portfolio count changes
+    const handlePortfolioCountChanged = () => {
+      fetchPortfolioCount();
+    };
+
+    window.addEventListener("portfolioCountChanged", handlePortfolioCountChanged);
+
+    return () => {
+      window.removeEventListener("portfolioCountChanged", handlePortfolioCountChanged);
+    };
+  }, [currentUser?.id]);
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -202,7 +232,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarErrorBoundary>
-          <NavMain items={data.navMain} />
+          <NavMain items={data.navMain} portfolioCount={portfolioCount} />
         </SidebarErrorBoundary>
         <SidebarErrorBoundary>
           <NavSaved userId={currentUser?.id || ""} />

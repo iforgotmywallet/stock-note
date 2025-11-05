@@ -40,6 +40,25 @@ export interface CreatePortfolioParams {
  */
 export class PortfoliosService {
   /**
+   * Get the count of portfolios for a user
+   * @param userId - User ID
+   * @returns Promise<number> - Count of portfolios
+   */
+  static async getPortfolioCount(userId: string): Promise<number> {
+    try {
+      const count = await db.portfolio.count({
+        where: {
+          userId,
+        },
+      });
+      return count;
+    } catch (error) {
+      console.error("Error fetching portfolio count:", error);
+      return 0;
+    }
+  }
+
+  /**
    * Fetch all portfolios for a specific user with ticker relationships
    * @param userId - User ID to filter portfolios
    * @returns Promise<PortfolioWithTickers[]> - Array of portfolios with tickers

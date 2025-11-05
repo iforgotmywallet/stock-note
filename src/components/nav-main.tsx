@@ -20,12 +20,14 @@ import { PortfolioCreateDialog } from "~/components/portfolio-create-dialog";
 
 export function NavMain({
   items,
+  portfolioCount,
 }: {
   items: {
     title: string;
     url: string;
     icon?: Icon;
   }[];
+  portfolioCount?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -44,6 +46,8 @@ export function NavMain({
     if (pathname === "/portfolio") {
       router.refresh();
     }
+    // Trigger a custom event to refresh portfolio count in sidebar
+    window.dispatchEvent(new CustomEvent("portfolioCountChanged"));
   };
 
   return (
@@ -108,6 +112,13 @@ export function NavMain({
                   {isComingSoon && (
                     <div className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
                       Soon
+                    </div>
+                  )}
+                  
+                  {/* Portfolio count badge */}
+                  {item.title === "Portfolio" && portfolioCount !== undefined && portfolioCount > 0 && (
+                    <div className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-gray-500 dark:bg-gray-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      {portfolioCount}
                     </div>
                   )}
                 </div>

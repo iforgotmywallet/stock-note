@@ -157,6 +157,88 @@ export function PortfolioDashboardClient({
     }
   }, [portfolioId, tickers, connectionState.connected, subscribe, unsubscribe, initialPositions, initialActions]);
 
+  // Fetch HTTP prices for tickers without WebSocket prices (synchronous fallback)
+  useEffect(() => {
+    const fetchMissingPrices = async () => {
+      // Find tickers that don't have live prices
+      const missingTickers = tickers.filter(
+        (ticker) => livePrices[ticker] === undefined
+      );
+
+      if (missingTickers.length === 0) return;
+
+      console.log(
+        "[Portfolio Dashboard] Fetching HTTP prices for tickers without WebSocket data:",
+        missingTickers
+      );
+
+      try {
+        const tickersParam = missingTickers.join(",");
+        const response = await fetch(
+          `/api/portfolio/prices?tickers=${tickersParam}`
+        );
+
+        if (!response.ok) {
+          console.warn("Failed to fetch HTTP prices:", response.statusText);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.prices) {
+          let updatedCount = 0;
+
+          setPositions((prev) =>
+            prev.map((position) => {
+              // Only update if we don't have a WebSocket price
+              if (livePrices[position.ticker] !== undefined) {
+                return position;
+              }
+
+              const httpPrice = data.prices[position.ticker];
+
+              if (httpPrice && httpPrice > 0) {
+                updatedCount++;
+                const currentValue = position.shares * httpPrice;
+                const costBasis = position.shares * position.avg_cost;
+                const profitLoss = currentValue - costBasis;
+                const profitLossPct =
+                  costBasis !== 0
+                    ? (profitLoss / Math.abs(costBasis)) * 100
+                    : 0;
+
+                return {
+                  ...position,
+                  last_price: httpPrice,
+                  profit_loss: profitLoss,
+                  profit_loss_pct: profitLossPct,
+                  price_source: "stored" as const,
+                  updated_at: new Date(),
+                };
+              }
+
+              return position;
+            })
+          );
+
+          if (updatedCount > 0) {
+            setLastUpdated(new Date());
+            console.log(
+              `[Portfolio Dashboard] Updated ${updatedCount}/${missingTickers.length} prices via HTTP fallback`
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching HTTP fallback prices:", error);
+      }
+    };
+
+    // Only fetch if we have tickers and some are missing WebSocket prices
+    if (tickers.length > 0) {
+      fetchMissingPrices();
+    }
+  }, [tickers, livePrices]);
+
   // Merge live prices with position data
   const positionsWithLivePrices = useMemo(() => {
     return positions.map((position) => {
@@ -180,7 +262,11 @@ export function PortfolioDashboardClient({
           ),
         };
       }
-      return position;
+      // No live price - will be fetched via HTTP or use cached
+      return {
+        ...position,
+        price_source: position.last_price ? ("stored" as const) : undefined,
+      };
     });
   }, [positions, livePrices, priceTimestamps]);
 
@@ -239,6 +325,7 @@ export function PortfolioDashboardClient({
                 last_price: httpPrice,
                 profit_loss: profitLoss,
                 profit_loss_pct: profitLossPct,
+                price_source: "stored" as const,
                 updated_at: new Date(),
               };
             }
@@ -293,7 +380,7 @@ export function PortfolioDashboardClient({
     fetchActions();
   };
 
-  // HTTP polling fallback when WebSocket fails (Fallback 1)
+  // HTTP polling when WebSocket completely fails (only during market hours)
   useEffect(() => {
     if (!shouldFallbackToHttp) {
       return;
@@ -328,7 +415,7 @@ export function PortfolioDashboardClient({
     }
 
     console.log(
-      "[Portfolio Dashboard] Falling back to HTTP polling for price updates",
+      "[Portfolio Dashboard] WebSocket failed - starting HTTP polling",
     );
 
     // Start polling every 60 seconds to avoid rate limits

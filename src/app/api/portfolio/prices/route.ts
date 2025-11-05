@@ -79,10 +79,17 @@ export async function GET(request: NextRequest) {
       ticker: string;
       price: number | null;
       timestamp?: number;
-      error: string | null;
+      error?: string;
     }> = [];
 
-    for (const ticker of tickers) {
+    for (let i = 0; i < tickers.length; i++) {
+      const ticker = tickers[i];
+      if (!ticker) continue;
+
+      // Add 1 second delay between requests (except for the first one)
+      if (i > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
 
       try {
         const finnhubResponse = await fetch(
@@ -127,7 +134,6 @@ export async function GET(request: NextRequest) {
           ticker,
           price: priceData.c,
           timestamp: Date.now(),
-          error: null,
         });
       } catch (error) {
         const errorMsg =
