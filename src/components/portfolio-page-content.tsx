@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { IconBriefcase, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { Button } from "~/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import {
   Card,
   CardContent,
@@ -12,7 +15,6 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { PortfolioTable, type Portfolio } from "~/components/portfolio-table";
-import { PortfolioCreateDialog } from "~/components/portfolio-create-dialog";
 
 interface PortfolioPageContentProps {
   portfolios: Portfolio[];
@@ -21,14 +23,6 @@ interface PortfolioPageContentProps {
 export function PortfolioPageContent({
   portfolios: initialPortfolios,
 }: PortfolioPageContentProps) {
-  const router = useRouter();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  const handlePortfolioCreated = () => {
-    // Refresh the page to show the new portfolio
-    router.refresh();
-  };
-
   return (
     <div className="container mx-auto px-4 py-6 md:px-6">
       {/* Page Header */}
@@ -44,14 +38,23 @@ export function PortfolioPageContent({
             </p>
           </div>
         </div>
-        <Button
-          className="flex w-full items-center gap-2 sm:w-auto"
-          onClick={() => setIsDialogOpen(true)}
-          aria-label="Create new portfolio"
-        >
-          <IconPlus className="size-4" aria-hidden="true" />
-          <span className="sm:inline">Create Portfolio</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="w-full sm:w-auto">
+              <Button
+                className="flex w-full cursor-not-allowed items-center gap-2 opacity-50 sm:w-auto"
+                disabled
+                aria-label="Create new portfolio — Coming Soon"
+              >
+                <IconPlus className="size-4" aria-hidden="true" />
+                <span className="sm:inline">Create Portfolio</span>
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">Coming Soon</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Portfolio Content */}
@@ -76,13 +79,6 @@ export function PortfolioPageContent({
           </CardContent>
         </Card>
       </div>
-
-      {/* Portfolio Creation Dialog */}
-      <PortfolioCreateDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onPortfolioCreated={handlePortfolioCreated}
-      />
     </div>
   );
 }

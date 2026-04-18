@@ -6,9 +6,13 @@ import {
   type Icon,
 } from "@tabler/icons-react";
 import { useRouter, usePathname } from "next/navigation";
-import { useState } from "react";
 
 import { Button } from "~/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -16,7 +20,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "~/components/ui/sidebar";
-import { PortfolioCreateDialog } from "~/components/portfolio-create-dialog";
 
 export function NavMain({
   items,
@@ -31,23 +34,9 @@ export function NavMain({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isPortfolioDialogOpen, setIsPortfolioDialogOpen] = useState(false);
 
   const handleStartAnalysis = () => {
     router.push("/");
-  };
-
-  const handleCalendarClick = () => {
-    setIsPortfolioDialogOpen(true);
-  };
-
-  const handlePortfolioCreated = () => {
-    // Refresh the page if we're on the portfolio page to show the new portfolio
-    if (pathname === "/portfolio") {
-      router.refresh();
-    }
-    // Trigger a custom event to refresh portfolio count in sidebar
-    window.dispatchEvent(new CustomEvent("portfolioCountChanged"));
   };
 
   return (
@@ -63,15 +52,24 @@ export function NavMain({
               <IconTerminal2 />
               <span>Start Analysis</span>
             </SidebarMenuButton>
-            <Button
-              size="icon"
-              className="size-8 group-data-[collapsible=icon]:opacity-0"
-              variant="outline"
-              onClick={handleCalendarClick}
-              title="Create Portfolio"
-            >
-              <IconCalendarTime />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex group-data-[collapsible=icon]:opacity-0">
+                  <Button
+                    size="icon"
+                    className="size-8 cursor-not-allowed opacity-50"
+                    variant="outline"
+                    disabled
+                    aria-label="Schedule Stock Monitor — Coming Soon"
+                  >
+                    <IconCalendarTime />
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Coming Soon</p>
+              </TooltipContent>
+            </Tooltip>
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
@@ -128,11 +126,6 @@ export function NavMain({
         </SidebarMenu>
       </SidebarGroupContent>
       
-      <PortfolioCreateDialog
-        open={isPortfolioDialogOpen}
-        onOpenChange={setIsPortfolioDialogOpen}
-        onPortfolioCreated={handlePortfolioCreated}
-      />
     </SidebarGroup>
   );
 }
